@@ -58,7 +58,16 @@ export async function convertSheetMusic(inputPath: string, cfg: AppConfig): Prom
   }
 
   const backend = cfg.conversion.backend;
-  if (backend === "n8n") return convertViaN8n(cfg, source, ext, await fs.readFile(inputPath));
+  if (backend === "n8n") {
+    try {
+      return await convertViaN8n(cfg, source, ext, await fs.readFile(inputPath));
+    } catch (e: any) {
+      // n8n unreachable -> fall back to local Audiveris + music21
+      const r = await convertLocally(cfg, inputPath, source);
+      r.warnings = [...r.warnings, `n8n unavailable (${e?.message ?? String(e)}); used local fallback`];
+      return r;
+    }
+  }
   if (backend === "local") return convertLocally(cfg, inputPath, source);
   return fail(source, [
     'No conversion backend configured. Set `conversion.backend: "n8n"` (recommended) or `"local"` (Audiveris + music21) in config.yaml.',
@@ -82,7 +91,7 @@ async function convertViaN8n(
       signal: ctrl.signal,
     });
     if (!res.ok) {
-      return fail(source, [`OMR webhook returned ${res.status} ${res.statusText}`], "n8n");
+      throw new Error(`OMR webhook returned ${res.status} ${res.statusText}`);
     }
     const json: any = await res.json();
     return {
@@ -93,8 +102,6 @@ async function convertViaN8n(
       backend: "n8n",
       source,
     };
-  } catch (e: any) {
-    return fail(source, [`OMR webhook unreachable: ${e?.message ?? String(e)}`], "n8n");
   } finally {
     clearTimeout(t);
   }

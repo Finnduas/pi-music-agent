@@ -80,14 +80,14 @@ const DEFAULTS: AppConfig = {
     },
   },
   validation: {
-    backend: "local",
+    backend: "n8n",
     n8n: {
       webhookUrl: "http://localhost:5678/webhook/notation-validation",
       timeoutMs: 15000,
     },
   },
   conversion: {
-    backend: "none",
+    backend: "n8n",
     n8n: {
       webhookUrl: "http://localhost:5678/webhook/omr-conversion",
       timeoutMs: 120000,

@@ -47,14 +47,14 @@ roles:
 
 # -------- Validation: local abcjs (default) or the n8n webhook --------------
 validation:
-  backend: local             # "local" | "n8n"
+  backend: n8n               # "local" | "n8n"
   n8n:
     webhookUrl: "http://localhost:5678/webhook/notation-validation"
     timeoutMs: 15000
 
 # -------- Sheet music -> ABC conversion (OMR stretch goal) -------------------
 conversion:
-  backend: "none"            # "none" | "n8n" | "local"
+  backend: "n8n"             # "none" | "n8n" | "local"
   n8n:                       # import n8n/omr-conversion.json into n8n
     webhookUrl: "http://localhost:5678/webhook/omr-conversion"
     timeoutMs: 120000

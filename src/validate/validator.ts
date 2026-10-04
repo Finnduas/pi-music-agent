@@ -78,6 +78,7 @@ async function validateWithAbcjs(notation: string): Promise<ValidationResult> {
 
 /* ----------------------------- n8n backend ------------------------------- */
 
+/** Throws on transport failure (unreachable / non-2xx) so callers can fall back. */
 async function validateWithN8n(
   req: ValidationRequest,
   webhookUrl: string,
@@ -92,26 +93,12 @@ async function validateWithN8n(
       body: JSON.stringify(req),
       signal: ctrl.signal,
     });
-    if (!res.ok) {
-      return {
-        valid: false,
-        errors: [`n8n webhook returned ${res.status} ${res.statusText}`],
-        warnings: [],
-        backend: "n8n",
-      };
-    }
+    if (!res.ok) throw new Error(`n8n webhook returned ${res.status} ${res.statusText}`);
     const json: any = await res.json();
     return {
       valid: Boolean(json.valid),
       errors: json.errors ?? [],
       warnings: json.warnings ?? [],
-      backend: "n8n",
-    };
-  } catch (e: any) {
-    return {
-      valid: false,
-      errors: [`n8n webhook unreachable: ${e?.message ?? String(e)}`],
-      warnings: [],
       backend: "n8n",
     };
   } finally {
@@ -127,8 +114,18 @@ export function createValidator(opts: {
 }): Validator {
   if (opts.backend === "n8n") {
     return {
-      validate: (req) =>
-        validateWithN8n(req, opts.n8n.webhookUrl, opts.n8n.timeoutMs),
+      validate: async (req) => {
+        try {
+          return await validateWithN8n(req, opts.n8n.webhookUrl, opts.n8n.timeoutMs);
+        } catch (e: any) {
+          // n8n unreachable -> fall back to local abcjs
+          const r = await validateWithAbcjs(req.notation);
+          return {
+            ...r,
+            warnings: [...r.warnings, `n8n unavailable (${e?.message ?? String(e)}); used local abcjs fallback`],
+          };
+        }
+      },
     };
   }
   return { validate: (req) => validateWithAbcjs(req.notation) };

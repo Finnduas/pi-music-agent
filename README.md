@@ -11,7 +11,7 @@ converts sheet music, working in **ABC notation** (plain-text music).
 ```
 you ─► Pi (the agent) ─► sheetmusic_* tools ─► pi-music-agent CLI ─► LLM + validator + renderer
           "fill in the gap        compose · edit · transpose            composer ⇄ critic loop,
-           in this piece"         analyze · convert                     abcjs, optional n8n
+           in this piece"         convert                             abcjs + n8n      
 ```
 
 The music agent is a **tool, not code Pi edits**: for music tasks Pi only calls the
@@ -22,9 +22,9 @@ CLI; it never touches this repo's source.
 | You say | What happens |
 |---|---|
 | "Write me a minuet based on the work in the input folder" | `sheetmusic_compose` with `.input/` as style references |
-| "Fill in the gap in this piece" | `sheetmusic_analyze` finds the gap → `sheetmusic_edit` fills only those bars |
-| "Rewrite this in F major" | `sheetmusic_analyze` → compute semitones → `sheetmusic_transpose` (deterministic, no LLM) |
-| "Turn .input/score.pdf into notation" | `sheetmusic_convert` (OMR via n8n or local Audiveris) |
+| "Fill in the gap in this piece" | `sheetmusic_edit` fills only those bars |
+| "Rewrite this in F major" | compute semitones → `sheetmusic_transpose` (deterministic, no LLM) |
+| "Turn .input/score.pdf into notation" | `sheetmusic_convert` (OMR via n8n, local Audiveris as fallback) |
 
 Results land in `.output/` as `.abc` + an `.html` sheet-music viewer. Open it in any
 browser: **Play** (audio), **Download MIDI**, **Print / Save PDF**, **Download .abc**.
@@ -61,24 +61,19 @@ Start `pi` (or run `/reload`) and type `/music`. Details: [pi-integration/README
 
 ## Commands
 
+You only need two commands. Everything else (analyze, transpose, convert, validate, render, list, config, serve) is used internally by the agent and is not user-facing.
+
 | Command | Does | LLM? |
 |---|---|---|
 | `compose "<request>"` | write a new piece (`--style`, `--refs <folder>`) | yes |
 | `edit <file> "<instruction>"` | change a piece, e.g. fill a gap | yes |
-| `analyze <file>` | bars, key, meter, voices, gaps | no |
-| `transpose <n> <file>` | move by n semitones, exact | no |
-| `convert <file>` | PDF / image / MusicXML → ABC | no |
-| `validate <file>` · `render <file>` · `list` · `config` | check, make the viewer, list, show settings | no |
-| `serve` | local HTTP API so **n8n** can drive the agent | – |
 
-Every option is in the [command reference](docs/USAGE.md#command-reference).
-
-## n8n (optional automation)
+## n8n (required)
 
 `n8n/` has four importable workflows: an **inbox** (drop a file in `.input/`: scans are
 converted, gaps are filled, a viewer is rendered), a **compose webhook** (`POST` a request,
 get a piece), and the **validation** and **scanned-music** services the agent can call.
-Setup and tests: [n8n/README.md](n8n/README.md).
+n8n is the primary backend for validation and conversion; the local abcjs validator and Audiveris converter remain as fallback. Setup and tests: [n8n/README.md](n8n/README.md).
 
 ## How it works, in one picture
 
@@ -87,7 +82,7 @@ request / existing ABC
    │
    ▼  composer LLM ─────────────┐
    ▼                            │ errors fed back (≤ N retries)
- validate ── invalid ───────────┘      local abcjs  OR  n8n webhook
+ validate ── invalid ───────────┘      n8n webhook (local abcjs as fallback)
    │ valid
    ▼  critic LLM ── score < threshold ──► revise ──► validate
    │ good enough

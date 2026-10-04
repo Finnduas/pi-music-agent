@@ -8,7 +8,8 @@ overview see the [README](../README.md); for how the pieces fit together see
 
 - Node.js 18+ (built and tested on Node 22)
 - An OpenRouter API key, **or** a local [Ollama](https://ollama.com) install
-- Optional: n8n (automation), Audiveris + music21 (reading scanned sheet music)
+- n8n (primary backend for validation and scan conversion; see [n8n/README.md](../n8n/README.md))
+- Optional local fallback: Audiveris + music21 (reading scanned sheet music when n8n is unreachable)
 
 ## Install
 
@@ -24,14 +25,22 @@ cp config.example.yaml config.yaml   # then edit
 Run as `node dist/cli.js <command>` (after `npm run build`), or `npx tsx src/cli.ts <command>`
 without building. All commands accept `-c, --config <path>` to use another config file.
 
+**User-facing commands**
+
 | Command | Uses the LLM? | What it does |
 |---|---|---|
 | `compose "<request>"` | yes | Write a new piece, check it, critique it, revise it, render it |
 | `edit <file> "<instruction>"` | yes | Change an existing piece (fill a gap, rework a passage) |
+
+**Agent-only commands.** The commands below are called by the agent (Pi) and by n8n, not by
+the user directly.
+
+| Command | Uses the LLM? | What it does |
+|---|---|---|
 | `analyze [file]` | no | Bars, meter, key, voices, candidate gaps |
 | `transpose <semitones> [file]` | no | Move a piece up or down; exact, key-signature aware |
 | `convert <input>` | no | PDF / image / MusicXML / ABC → validated ABC |
-| `validate [file]` | no | Check that ABC parses (local abcjs or n8n) |
+| `validate [file]` | no | Check that ABC parses (n8n, falling back to local abcjs) |
 | `render <file>` | no | Make the HTML viewer for an ABC file |
 | `list` | no | List stored pieces |
 | `serve` | – | Start the local HTTP API for n8n |
@@ -98,8 +107,7 @@ node dist/cli.js convert .input/score.pdf
 node dist/cli.js convert .input/piece.abc          # validates and copies
 ```
 
-Options: `-o/--out <dir>`, `--json`. Needs `conversion.backend` set to `n8n` or `local` for
-scans (see [install-tools](../scripts/install-tools.md)). Exits non-zero if the result is
+Options: `-o/--out <dir>`, `--json`. Scans go through n8n first and fall back to local Audiveris + music21 if n8n is unreachable (set `conversion.backend: local` to force local) (see [install-tools](../scripts/install-tools.md)). Exits non-zero if the result is
 not valid ABC.
 
 ### validate
@@ -110,7 +118,7 @@ printf 'X:1\nK:C\nCDEF|]' | node dist/cli.js validate -
 ```
 
 Prints `valid`, `errors`, `warnings`; exit code 1 when invalid. Uses
-`validation.backend` (`local` or `n8n`). Option: `--json`.
+`validation.backend` (`n8n` by default, with automatic fallback to local abcjs; `local` forces local). Option: `--json`.
 
 ### render
 
@@ -149,8 +157,8 @@ Starts the HTTP API on `127.0.0.1` (local only). See [HTTP API](#http-api).
 | `storage` | `inputDir` (`./.input`) and `dir` (`./.output`) |
 | `providers` | where LLM calls go: `openrouter`, `ollama`, … (one OpenAI-compatible client) |
 | `roles` | which provider/model/temperature/`maxTokens`/`reasoning` for `composer` and `critic` |
-| `validation` | `backend: local` (abcjs, default) or `n8n` + `n8n.webhookUrl` |
-| `conversion` | `backend: none` (default) / `n8n` / `local` (Audiveris + music21) |
+| `validation` | `backend: n8n` (default; falls back to local abcjs if unreachable) or `local`, plus `n8n.webhookUrl` |
+| `conversion` | `backend: n8n` (default; falls back to local Audiveris + music21 if unreachable) / `local` / `none` |
 | `loop` | `maxValidationRetries` (5), `maxIterations` (3), `scoreThreshold` (8) |
 
 ### OpenRouter (default: Kimi K2.6, open weights)
@@ -203,18 +211,24 @@ curl -s localhost:7878/analyze -H 'Content-Type: application/json' -d '{"file":"
 
 Errors are `{ "error": "…" }` with status 400 (bad input), 404 (file not found) or 500.
 
-## n8n (optional)
+## n8n (required, with local fallback)
 
 Four importable workflows in [`n8n/`](../n8n/): an **inbox** (drop a file in `.input`),
 a **compose webhook**, and the **validation** and **OMR** services the agent can call.
 Setup, environment variables and testing: [n8n/README.md](../n8n/README.md).
 
-To make the agent use n8n for a service, set in `config.yaml`:
+n8n is the default for both services, in `config.yaml`:
 
 ```yaml
 validation: { backend: n8n }     # needs the Notation Validation workflow active
 conversion: { backend: n8n }     # needs the OMR workflow + Audiveris + music21
 ```
+
+**Fallback.** If n8n cannot be reached (connection error, timeout or non-2xx response),
+validation retries with local abcjs and conversion retries with local Audiveris + music21.
+The result then carries a warning ("n8n unavailable ... used local fallback"). If n8n
+answers and says the notation is invalid, that verdict is kept and no fallback happens.
+Set a backend to `local` to skip n8n entirely.
 
 ## Viewing and playing ABC files
 
