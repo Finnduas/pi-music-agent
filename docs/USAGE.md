@@ -22,7 +22,7 @@ cp config.example.yaml config.yaml   # then edit
 
 `config.yaml` has four sections — providers, roles, validation, render/loop.
 
-### OpenRouter (default)
+### OpenRouter (default: Kimi K2.6, open weights)
 
 ```yaml
 providers:
@@ -30,12 +30,16 @@ providers:
     baseUrl: "https://openrouter.ai/api/v1"
     apiKey: ""            # leave blank to read OPENROUTER_API_KEY
 roles:
-  composer: { provider: openrouter, model: "anthropic/claude-sonnet-5.5", temperature: 0.9 }
-  critic:   { provider: openrouter, model: "anthropic/claude-sonnet-5.5", temperature: 0.2 }
+  composer: { provider: openrouter, model: "moonshotai/kimi-k2.6", temperature: 0.9 }
+  critic:   { provider: openrouter, model: "moonshotai/kimi-k2.6", temperature: 0.2 }
 ```
 
 The key is read, in order: `config.yaml` → `OPENROUTER_API_KEY` env var → pi's
 own `~/.pi/agent/auth.json`. Verify with `music-agent config` (secrets redacted).
+
+**Thinking models:** Kimi K2.6 spends its token budget on hidden reasoning unless you set
+`reasoning: { enabled: false }` on the role (the default config does). Other OpenRouter
+reasoning options (`effort`, `max_tokens`) were ignored by this model when we tried them.
 
 ### Local / fully offline (Ollama)
 

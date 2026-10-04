@@ -151,8 +151,18 @@ function lastNotePc(abc: string): number | null {
  * text annotation (e.g. `"^GAP" z4`). Returned as human-readable ranges per
  * voice, e.g. "RH bars 5-6". Deterministic hint; the user's request decides.
  */
-export function findGaps(abc: string): string[] {
-  const byVoice = new Map<string, number[]>();
+export interface BarInfo {
+  voice: string;
+  /** 1-based bar number within the voice. */
+  n: number;
+  text: string;
+  /** Rest-only bar, or annotated "GAP"/"?". */
+  gap: boolean;
+}
+
+/** Split the tune body into bars, per voice (shared by gap detection and the edit guard). */
+export function barsOf(abc: string): BarInfo[] {
+  const out: BarInfo[] = [];
   let voice = "default";
   const barNo: Record<string, number> = {};
   for (const raw of bodyOf(abc).split(/\r?\n/)) {
@@ -176,12 +186,19 @@ export function findGaps(abc: string): string[] {
         .replace(/\[[A-Za-z]:[^\]]*\]/g, "")
         .replace(/[\s()<>~.-]/g, "");
       const restOnly = /^[zxZX\d/]*$/.test(stripped) && /[zxZX]/.test(stripped);
-      if (annotated || restOnly) {
-        const list = byVoice.get(voice) ?? [];
-        list.push(barNo[voice]);
-        byVoice.set(voice, list);
-      }
+      out.push({ voice, n: barNo[voice], text: piece.replace(/\s+/g, " "), gap: annotated || restOnly });
     }
+  }
+  return out;
+}
+
+export function findGaps(abc: string): string[] {
+  const byVoice = new Map<string, number[]>();
+  for (const b of barsOf(abc)) {
+    if (!b.gap) continue;
+    const list = byVoice.get(b.voice) ?? [];
+    list.push(b.n);
+    byVoice.set(b.voice, list);
   }
   const out: string[] = [];
   for (const [vid, nums] of byVoice) {
@@ -199,6 +216,44 @@ export function findGaps(abc: string): string[] {
     flush();
   }
   return out;
+}
+
+/**
+ * Edit guard: everything that is NOT a gap in `original` must be unchanged in `edited`
+ * (same headers M/L/K, same bar count per voice, identical bars outside the gaps).
+ * Returns human-readable violations; empty means the edit stayed inside the gap.
+ */
+export function changesOutsideGaps(original: string, edited: string): string[] {
+  const problems: string[] = [];
+  const h1 = parseHeaders(original);
+  const h2 = parseHeaders(edited);
+  for (const k of ["m", "l", "k"] as const) {
+    if ((h1[k] ?? "").replace(/\s+/g, "") !== (h2[k] ?? "").replace(/\s+/g, "")) {
+      problems.push(`header ${k.toUpperCase()}: changed from "${h1[k] ?? ""}" to "${h2[k] ?? ""}"`);
+    }
+  }
+  const a = barsOf(original);
+  const b = barsOf(edited);
+  const count = (bars: BarInfo[]) => {
+    const m = new Map<string, number>();
+    for (const x of bars) m.set(x.voice, (m.get(x.voice) ?? 0) + 1);
+    return m;
+  };
+  const ca = count(a);
+  const cb = count(b);
+  for (const [v, n] of ca) {
+    if ((cb.get(v) ?? 0) !== n) problems.push(`voice ${v}: bar count changed from ${n} to ${cb.get(v) ?? 0}`);
+  }
+  if (problems.some((p) => p.includes("bar count"))) return problems; // positions no longer comparable
+  const edit = new Map(b.map((x) => [`${x.voice}#${x.n}`, x]));
+  for (const x of a) {
+    if (x.gap) continue;
+    const y = edit.get(`${x.voice}#${x.n}`);
+    if (y && y.text !== x.text) {
+      problems.push(`${x.voice === "default" ? "" : x.voice + " "}bar ${x.n} was changed: "${x.text}" -> "${y.text}"`);
+    }
+  }
+  return problems;
 }
 
 export function analyzeScore(abc: string): ScoreAnalysis {

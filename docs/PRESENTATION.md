@@ -88,7 +88,7 @@ offline with fake LLMs and prints PASS lines; show `examples/output/` instead.
 
 ## 8. What I learned / design choices (1 min)
 
-- Model matters: DeepSeek V4 Pro failed at strict ABC; Claude Sonnet 5.5 works.
+- Model matters: DeepSeek V4 Pro failed at strict ABC. The default, Kimi K2.6 (open weights), works and is ~4x faster than Sonnet 5.5, but scores lower with our critic (4.5–7 vs 7–7.3) and wanders: so the gap-fill is guarded in code (bars outside the gap are verified unchanged).
 - Giving the LLM *facts* (bar count, key, gaps) beats asking it to count.
 - Keep the creative LLM inside validate-and-critique rails.
 
@@ -111,8 +111,12 @@ deterministic code. Same for counting bars and finding gaps.
 **Can it read a PDF?** Via the OMR workflow (Audiveris → MusicXML → music21 → ABC)
 in n8n or locally. Not live-tested end-to-end yet — it is mock-tested.
 
-**Which model?** `anthropic/claude-sonnet-5.5` through OpenRouter (swap in
-`config.yaml`; Ollama also supported).
+**Which model, and is it open source?** `moonshotai/kimi-k2.6` through OpenRouter, for both
+Pi and the music agent. The weights are open (modified MIT: attribution only above 100M
+users / $20M monthly revenue), but at ~1T parameters you use it through a host, not locally.
+Other parts: abcjs (BSD/MIT), this repo (GPL-3.0). n8n is "fair-code" (source-available,
+not OSI open source), and OpenRouter itself is a proprietary gateway; for fully local, point
+`roles` at Ollama. Swap models in `config.yaml`.
 
 **Can Pi break the music agent?** For music tasks the skill forbids editing its
 source; the extension only runs the built CLI.

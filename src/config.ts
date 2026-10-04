@@ -18,6 +18,11 @@ export interface RoleConfig {
   model: string;
   temperature?: number;
   maxTokens?: number;
+  /**
+   * Passed through as OpenRouter's "reasoning" field. Thinking models (e.g. Kimi K2.6)
+   * otherwise spend the token budget thinking: { enabled: false } turns it off.
+   */
+  reasoning?: Record<string, unknown>;
 }
 
 export interface AppConfig {
@@ -68,15 +73,17 @@ const DEFAULTS: AppConfig = {
   roles: {
     composer: {
       provider: "openrouter",
-      model: "anthropic/claude-sonnet-5.5",
+      model: "moonshotai/kimi-k2.6",
       temperature: 0.9,
-      maxTokens: 4096,
+      maxTokens: 8192,
+      reasoning: { enabled: false },
     },
     critic: {
       provider: "openrouter",
-      model: "anthropic/claude-sonnet-5.5",
+      model: "moonshotai/kimi-k2.6",
       temperature: 0.2,
-      maxTokens: 4096,
+      maxTokens: 8192,
+      reasoning: { enabled: false },
     },
   },
   validation: {

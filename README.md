@@ -35,7 +35,7 @@ See [Viewing and playing ABC files](docs/USAGE.md#viewing-and-playing-abc-files)
 ```bash
 git clone https://github.com/Finnduas/pi-music-agent && cd pi-music-agent
 npm install
-cp config.example.yaml config.yaml        # default: Claude Sonnet 5.5 via OpenRouter
+cp config.example.yaml config.yaml        # default: Kimi K2.6 (open weights) via OpenRouter
 export OPENROUTER_API_KEY=sk-or-...       # or put it in config.yaml
 npm run build
 

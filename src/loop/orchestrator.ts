@@ -9,7 +9,7 @@ import type { AppConfig } from "../config.js";
 import { projectRoot } from "../config.js";
 import { clientForRole, describeRole } from "../llm/roles.js";
 import { extractAbc, extractJson } from "../llm/parse.js";
-import { analyzeScore, formatAnalysis } from "../music/abc.js";
+import { analyzeScore, changesOutsideGaps, formatAnalysis } from "../music/abc.js";
 import { createValidator } from "../validate/validator.js";
 import { renderAbc } from "../render/renderer.js";
 import { Store } from "../store/store.js";
@@ -121,6 +121,11 @@ export async function composePiece(
   /* ---------------------------- initial ABC ----------------------------- */
   let abc = req.existingAbc?.trim() ?? "";
   const isEdit = Boolean(abc && req.edit);
+  const originalAbc = abc;
+  // "Fill the gap" edits are held to a strict rule: nothing outside the gap may change.
+  const gapFill =
+    isEdit && analyzeScore(abc).gaps.length > 0 && /\b(gap|fill|missing|blank|empty)/i.test(req.request);
+  const gapGuardWarnings: string[] = [];
   if (isEdit) {
     const before = analyzeScore(abc).gaps;
     say(`Editing supplied score. Candidate gaps: ${before.length ? before.join("; ") : "none detected"}`);
@@ -136,6 +141,30 @@ export async function composePiece(
     abc = extractAbc(await askComposer(composer, composerSystem, user));
     const after = analyzeScore(abc).gaps;
     say(`Edit applied. Remaining candidate gaps: ${after.length ? after.join("; ") : "none"}`);
+
+    if (gapFill) {
+      for (let attempt = 1; ; attempt++) {
+        const bad = changesOutsideGaps(originalAbc, abc);
+        if (!bad.length) {
+          say("Guard: every bar outside the gap is unchanged.");
+          break;
+        }
+        say(`Guard: the edit changed music outside the gap (${bad.length}): ${bad.slice(0, 3).join("; ")}`);
+        if (attempt >= cfg.loop.maxValidationRetries) {
+          gapGuardWarnings.push(`Edit changed music outside the gap: ${bad.slice(0, 5).join("; ")}`);
+          say("Guard: giving up; the result still differs outside the gap (see warnings).");
+          break;
+        }
+        const retry =
+          `Your edit changed music OUTSIDE the gap, which is not allowed. Problems:\n` +
+          `${bad.slice(0, 8).map((p) => `- ${p}`).join("\n")}\n\n` +
+          `Redo it: copy every bar outside the gap EXACTLY as in the original (headers, voices, ` +
+          `notes, accidentals) and write new music only for the gap bars.\n\n` +
+          `Instruction: ${req.request}\n${factsBlock(originalAbc)}\n` +
+          `Original ABC:\n\`\`\`abc\n${originalAbc}\n\`\`\``;
+        abc = extractAbc(await askComposer(composer, composerSystem, retry));
+      }
+    }
   } else if (abc) {
     say("Starting from supplied ABC (skipping initial composition).");
   } else {
@@ -184,6 +213,7 @@ export async function composePiece(
 
   /* ------------------------ critique / iterate -------------------------- */
   let criticReport: CriticReport | null = null;
+  let best: { abc: string; report: CriticReport } | null = null;
   let iterations = 0;
 
   for (let iter = 0; iter < cfg.loop.maxIterations; iter++) {
@@ -191,6 +221,12 @@ export async function composePiece(
     say(`Critique pass ${iterations}/${cfg.loop.maxIterations}...`);
     const user =
       `Original request: ${req.request}\n${styleLine}` +
+      (gapFill
+        ? `NOTE: this is a GAP-FILL. The piece already existed; only ${analyzeScore(originalAbc).gaps.join("; ")} ` +
+          `(the gap) were newly written. Judge ONLY those bars: do they fit the surrounding key, harmony, ` +
+          `rhythm, texture and phrase shape, and do they lead naturally into the next bar? ` +
+          `Do NOT criticise or suggest changes to any other bar.\n`
+        : "") +
       `${factsBlock(abc)}Evaluate the following ABC score.\n\n\`\`\`abc\n${abc}\n\`\`\``;
     let report: CriticReport;
     let text = "";
@@ -203,6 +239,7 @@ export async function composePiece(
     }
     criticReport = report;
     say(`Score: ${report.score}/10 - ${report.summary}`);
+    if (!best || report.score >= best.report.score) best = { abc, report };
 
     if (report.score >= cfg.loop.scoreThreshold) {
       say(`Score meets threshold (${cfg.loop.scoreThreshold}); stopping early.`);
@@ -218,18 +255,40 @@ export async function composePiece(
       `Revise the following ABC score to address the critic's feedback. Return the ` +
       `complete revised score in a \`\`\`abc fenced block.\n\n` +
       `Original request: ${req.request}\n\n` +
-      (isEdit ? `This is an EDIT of an existing piece: change nothing outside the edited passage.\n\n` : "") +
+      (gapFill
+        ? `This is a GAP-FILL: modify ONLY the bars that were originally the gap (${analyzeScore(originalAbc).gaps.join("; ")}). ` +
+          `Every other bar must stay exactly as it is now, even if the feedback below mentions it.\n\n`
+        : isEdit
+          ? `This is an EDIT of an existing piece: change nothing outside the edited passage.\n\n`
+          : "") +
       `Critic issues:\n${report.issues.map((i) => `- ${i}`).join("\n") || "- (none listed)"}\n\n` +
       `Suggested revisions:\n${report.suggestions.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +
       `Strengths to preserve:\n${report.strengths.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +
       `${factsBlock(abc)}Current ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
+    const beforeRevision = abc;
     abc = extractAbc(await askComposer(composer, composerSystem, reviseUser));
     valid = await ensureValid("revision");
+    if (gapFill) {
+      const bad = changesOutsideGaps(originalAbc, abc);
+      if (bad.length) {
+        say(`Guard: revision rejected, it changed music outside the gap (${bad.slice(0, 2).join("; ")}). Keeping the previous version.`);
+        abc = beforeRevision;
+        valid = true;
+        break;
+      }
+    }
+  }
+
+  // A revision can make things worse: never return a version scoring below an earlier one.
+  if (best && criticReport && best.report.score > criticReport.score) {
+    say(`Keeping the best version (${best.report.score}/10), not the last one (${criticReport.score}/10).`);
+    abc = best.abc;
+    criticReport = best.report;
   }
 
   /* ----------------------- final validation ----------------------------- */
   const finalVal = await validator.validate({ notation: abc, title, style: req.style });
-  validationWarnings.push(...finalVal.warnings);
+  validationWarnings.push(...finalVal.warnings, ...gapGuardWarnings);
   if (!finalVal.valid) valid = false;
 
   /* ----------------------------- render --------------------------------- */

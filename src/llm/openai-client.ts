@@ -30,6 +30,8 @@ export interface ChatOptions {
   maxTokens?: number;
   signal?: AbortSignal;
   tools?: ToolSpec[];
+  /** OpenRouter's unified reasoning control, e.g. { enabled: false } or { effort: "low" }. */
+  reasoning?: Record<string, unknown>;
 }
 
 export interface ChatResult {
@@ -64,6 +66,7 @@ export class OpenAICompatClient {
         max_tokens: opts.maxTokens,
         stream: false,
         ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" } : {}),
+        ...(opts.reasoning ? { reasoning: opts.reasoning } : {}),
       }),
       signal: opts.signal,
     });
@@ -77,6 +80,16 @@ export class OpenAICompatClient {
     const json: any = await res.json();
     const msg = json?.choices?.[0]?.message ?? {};
     const content: string = msg.content ?? "";
+    const finish = json?.choices?.[0]?.finish_reason;
+    const thinking = json?.usage?.completion_tokens_details?.reasoning_tokens ?? 0;
+    if (!content.trim() && !msg.tool_calls?.length && finish === "length") {
+      // A "thinking" model can spend the whole token budget reasoning and return nothing.
+      throw new Error(
+        `Model ${opts.model} hit max_tokens (${opts.maxTokens}) before answering` +
+          (thinking ? ` (it spent ${thinking} tokens thinking)` : "") +
+          `. Raise roles.<role>.maxTokens or set roles.<role>.reasoning: { enabled: false } in config.yaml.`,
+      );
+    }
     const toolCalls: ToolCall[] | undefined = Array.isArray(msg.tool_calls)
       ? msg.tool_calls.map((tc: any) => ({
           id: tc.id,

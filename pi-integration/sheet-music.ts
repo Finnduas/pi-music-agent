@@ -87,19 +87,31 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "sheetmusic_compose",
     label: "Compose sheet music",
+    promptSnippet: "sheetmusic_compose: write a new piece of sheet music (ABC), optionally in the style of reference files",
+    promptGuidelines: [
+      "Never write ABC notation yourself for a music request; call the sheetmusic_* tools.",
+      "When the user wants a piece based on, in the style of, or inspired by existing files or a folder, pass that folder as sheetmusic_compose refDir (the tool reads the .abc files itself; you do not need to read or paste them). Keep `request` about the music wanted, and never put file paths in `title`.",
+      "Call sheetmusic_compose once per request; only call it again if the user asks for another version.",
+    ],
     description:
       "Compose a new piece of sheet music in ABC notation. Runs the full compose -> validate -> critique -> render loop. Use when asked to write, generate, or create a musical score, optionally in the style of reference pieces.",
     parameters: Type.Object({
       request: Type.String({ description: "Musical request, e.g. 'a wistful baroque minuet in D minor'" }),
       style: Type.Optional(Type.String({ description: "Style/period hint, e.g. baroque, romantic" })),
       title: Type.Optional(Type.String({ description: "Optional title" })),
-      refDir: Type.Optional(Type.String({ description: "Directory of reference .abc files to emulate (e.g. the input folder)" })),
+      refDir: Type.Optional(Type.String({ description: "Folder of reference .abc files whose style to emulate, e.g. 'examples/input' or '.input'. Pass this whenever the user wants a piece based on / in the style of existing music." })),
     }),
     async execute(_id, params, signal): Promise<any> {
       const args = ["compose", params.request, "--json"];
       if (params.style) args.push("--style", params.style);
       if (params.title) args.push("--title", params.title);
-      if (params.refDir) args.push("--refs", params.refDir);
+      // Models often forget refDir; if the request points at the input folder, supply it.
+      let refDir = params.refDir;
+      if (!refDir) {
+        const m = /(examples\/input|\.input)\b/i.exec(params.request) ?? (/\binput (folder|pieces|files|dir)/i.test(params.request) ? ["", ".input"] : null);
+        if (m) refDir = m[1];
+      }
+      if (refDir) args.push("--refs", resolveFile(refDir));
       const r = await runCli(pi, args, { timeout: 600000, signal });
       if (!r.ok) {
         return {
@@ -127,6 +139,10 @@ export default function (pi: ExtensionAPI) {
   pi.registerTool({
     name: "sheetmusic_transpose",
     label: "Transpose sheet music",
+    promptSnippet: "sheetmusic_transpose: move an ABC score by N semitones (deterministic, exact)",
+    promptGuidelines: [
+      "To rewrite a piece in another key: sheetmusic_analyze for the current key, work out the semitone shift (the short way, e.g. C to F is +5), then call sheetmusic_transpose. Never transpose by hand.",
+    ],
     description:
       'Transpose an ABC score by a number of semitones (e.g. "rewrite this in F major" = transpose by the right number of semitones). Writes the result to the output folder.',
     parameters: Type.Object({
@@ -186,6 +202,10 @@ ${r.stderr}` }], details: { error: r.stderr } };
   pi.registerTool({
     name: "sheetmusic_edit",
     label: "Edit sheet music",
+    promptSnippet: "sheetmusic_edit: change an existing ABC score with an instruction (e.g. fill in the gap)",
+    promptGuidelines: [
+      "For 'fill in the gap', call sheetmusic_analyze first and put the reported bar numbers in the sheetmusic_edit instruction. Call sheetmusic_edit once; for gap-fills the tool guarantees that nothing outside the gap changes.",
+    ],
     description:
       "Edit an existing ABC score with a natural-language instruction, e.g. 'fill in the gap', 'make bars 5-8 more lyrical'. Keeps everything else unchanged, then validates, critiques and renders the result. Use sheetmusic_analyze first to see where the gaps are.",
     parameters: Type.Object({
@@ -226,7 +246,7 @@ ${r.stderr}` }], details: { error: r.stderr } };
       notify(ctx, "Composing… (compose -> validate -> critique -> render)", "info");
       const opts = ["compose", request, "--json"];
       if (style) opts.push("--style", style);
-      if (refDir) opts.push("--refs", refDir);
+      if (refDir) opts.push("--refs", resolveFile(refDir));
       const r = await runCli(pi, opts, { timeout: 600000 });
       if (!r.ok) return notify(ctx, `Compose failed:\n${r.stderr}\n${r.stdout}`, "error");
       try {

@@ -52,6 +52,10 @@ the music tool's code, it says so and switches to normal code-editing.
 `/music` · `/compose` · `/music-edit` · `/music-analyze` · `/music-transpose` ·
 `/music-convert` · `/music-render` · `/music-validate` · `/music-list`
 
+**Tip: style references.** To compose "in the style of" a folder, the slash command is
+reliable: `/compose --refs examples/input a short minuet`. When you only *say* it, the model
+sometimes forgets to pass the folder to `sheetmusic_compose` (seen with Kimi K2.6).
+
 Relative file paths are resolved against Pi's working directory first, then the
 music agent folder (so `.input/piece.abc` works from anywhere).
 

@@ -23,17 +23,24 @@ providers:
     apiKey: "ollama"         # Ollama ignores it, but the client requires a value
 
 # -------- Role configuration: which provider/model plays which role ---------
+# Default: Kimi K2.6 (open weights, modified-MIT licence) served through OpenRouter.
+# Kimi is a "thinking" model: without `reasoning: { enabled: false }` it spends the
+# whole token budget thinking (we measured 4096 tokens / 100+ s and an empty answer).
+# Remove that line (and raise maxTokens to 16000+) if you want it to think; expect
+# much slower runs.
 roles:
   composer:
     provider: openrouter
-    model: "anthropic/claude-sonnet-5.5"
+    model: "moonshotai/kimi-k2.6"
     temperature: 0.9
-    maxTokens: 4096
+    maxTokens: 8192
+    reasoning: { enabled: false }
   critic:
     provider: openrouter
-    model: "anthropic/claude-sonnet-5.5"
+    model: "moonshotai/kimi-k2.6"
     temperature: 0.2
-    maxTokens: 4096
+    maxTokens: 8192
+    reasoning: { enabled: false }
 
   # --- Fully local example (install Ollama + `ollama pull qwen2.5:14b`) -----
   # composer: { provider: ollama, model: "qwen2.5:14b", temperature: 0.9 }

@@ -28,6 +28,7 @@ export function clientForRole(cfg: AppConfig, role: Role) {
           model: roleCfg.model,
           temperature: roleCfg.temperature,
           maxTokens: roleCfg.maxTokens,
+          reasoning: roleCfg.reasoning,
           signal,
         },
       );
@@ -46,6 +47,7 @@ export function clientForRole(cfg: AppConfig, role: Role) {
             model: roleCfg.model,
             temperature: roleCfg.temperature,
             maxTokens: roleCfg.maxTokens,
+          reasoning: roleCfg.reasoning,
             tools,
             signal,
           });
@@ -72,6 +74,7 @@ export function clientForRole(cfg: AppConfig, role: Role) {
             model: roleCfg.model,
             temperature: roleCfg.temperature,
             maxTokens: roleCfg.maxTokens,
+          reasoning: roleCfg.reasoning,
             signal,
           },
         );

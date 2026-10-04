@@ -24,7 +24,7 @@ There are **two agents** and one rule.
 ┌───────────────▼───────────── pi-music-agent (fixed tool) ───────────┐
 │ deterministic helpers          LLM loop                              │
 │  analyze · gaps · transpose    composer ⇄ validator ⇄ critic        │
-│  validate · render · store     (OpenRouter → Claude Sonnet 5.5)      │
+│  validate · render · store     (OpenRouter → Kimi K2.6)             │
 └───────────────┬──────────────────────────────────────────────────────┘
                 │ optional HTTP
 ┌───────────────▼───────────── n8n ────────────────────────────────────┐
@@ -157,7 +157,7 @@ Example: `examples/input/minuet-with-gap.abc`, 3/4 in G major, where bars 5–6 
 | 6 | **Pi** | Writes an informed instruction: *"fill in the gap in bars 5–6, flowing from the previous phrase into `d B G`"*. |
 | 7 | **Pi → tool** | Calls `sheetmusic_edit { file, instruction }` → `node dist/cli.js edit <file> "<instruction>" --json`. |
 | 8 | **orchestrator** | `composePiece({ edit: true })`: builds an *edit prompt*: instruction + rules (keep every other bar identical; match key/meter/rhythm; remove the GAP marker) + the "Score facts" + the full ABC. |
-| 9 | **Composer LLM** (Sonnet 5.5 via OpenRouter) | Returns the full score in an ```` ```abc ```` block. `parse.ts` extracts it. |
+| 9 | **Composer LLM** (Kimi K2.6 via OpenRouter) | Returns the full score in an ```` ```abc ```` block. `parse.ts` extracts it. |
 | 10 | **orchestrator** | Re-runs gap detection → logs *"Remaining candidate gaps: none"*. |
 | 11 | **validator** | abcjs parses the result (or the n8n webhook, if configured). If invalid, errors go back to the composer, up to `maxValidationRetries` (5). |
 | 12 | **Critic LLM** | Scores 0–10 with strengths/issues/suggestions. If score ≥ `scoreThreshold` (8) → stop. Otherwise a *revise* pass runs (with "change nothing outside the edited passage") and we loop, up to `maxIterations` (3). |
@@ -222,7 +222,7 @@ Setup steps: [USAGE.md → n8n validation service](USAGE.md#n8n-validation-servi
 
 | Service | Role | Required? |
 |---|---|---|
-| **OpenRouter** | LLM gateway; default model `anthropic/claude-sonnet-5.5` for composer and critic | yes (or Ollama) |
+| **OpenRouter** | LLM gateway; default model `moonshotai/kimi-k2.6` (open weights) for composer and critic | yes (or Ollama) |
 | **Ollama** | Local LLM alternative | no |
 | **abcjs** (npm) | ABC parsing for validation + in-browser rendering | yes (bundled) |
 | **abc2svg / abcm2ps** | Optional SVG engraving | no |
@@ -242,5 +242,13 @@ Setup steps: [USAGE.md → n8n validation service](USAGE.md#n8n-validation-servi
 - **Validate everything.** Every LLM output is parsed by abcjs; errors loop back.
 - **Model choice.** DeepSeek V4 Pro was tried first and dropped: it wrote
   single-line ABC, used `F#` instead of `^F`, and would not emit critic JSON.
-  Claude Sonnet 5.5 works (live runs scored 7–7.3/10 after 1–2 iterations).
+  Kimi K2.6 (open weights, modified-MIT licence) is the default: valid multi-line ABC,
+  correct `^F` accidentals, clean critic JSON. Measured on this project: 17–40 s per run
+  (Claude Sonnet 5.5 took ~90 s) at critic scores of 4.5–7/10 (Sonnet: 7–7.3), and it is
+  a "thinking" model, so `reasoning: { enabled: false }` is set per role (without it the
+  4096-token budget was spent thinking and the answer was empty). Sonnet 5.5 remains a
+  drop-in alternative in `config.yaml`.
+- **Enforced, not requested.** In a gap-fill the model kept rewriting other bars during the
+  critic-driven revision (seen live with Kimi). The loop now checks every bar outside the
+  gap against the original, retries or rejects the edit, and keeps the best-scoring version.
 - **Offline-testable.** Every layer has a smoke test using fake LLMs / mock n8n.
