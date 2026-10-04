@@ -1,0 +1,7 @@
+# Normalize line endings across platforms.
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.pdf binary
+*.svg text eol=lf
