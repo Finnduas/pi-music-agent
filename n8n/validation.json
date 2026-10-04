@@ -1,0 +1,92 @@
+{
+  "id": "pimusic1",
+  "versionId": "00000000-0000-4000-8000-000000000001",
+  "active": false,
+  "name": "Notation Validation Service",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "notation-validation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n01",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "notation-validation"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ABC validation for the \"Notation Validation Service\" n8n workflow.\n// Mirrors the local validator (src/validate/validator.ts): abcjs parseOnly (headless, no DOM),\n// plus the required X:/K: headers. No LLM, no loop, no storage.\n// Needs: NODE_FUNCTION_ALLOW_EXTERNAL=abcjs on the n8n instance and `abcjs` installed next to n8n.\nconst stripTags = (s) => String(s).replace(/<[^>]+>/g, '').replace(/\\s+/g, ' ').trim();\n\nfunction validate(notation) {\n  const errors = [];\n  const warnings = [];\n  if (!notation || typeof notation !== 'string' || notation.trim() === '') {\n    return { valid: false, errors: ['Empty notation.'], warnings };\n  }\n\n  let tunes = null;\n  try {\n    const abcjs = require('abcjs');\n    tunes = abcjs.parseOnly(notation);\n  } catch (e) {\n    warnings.push('abcjs unavailable in n8n (install it and set NODE_FUNCTION_ALLOW_EXTERNAL=abcjs); header checks only: ' + (e.message || e));\n  }\n\n  if (tunes) {\n    if (!Array.isArray(tunes) || tunes.length === 0) errors.push('No tunes found in notation.');\n    let staves = 0;\n    for (const t of tunes || []) {\n      for (const w of t.warnings || []) warnings.push(stripTags(w));\n      staves += (t.lines || []).reduce((n, l) => n + (l.staff || []).length, 0);\n    }\n    if (tunes.length && staves === 0) errors.push('No staff content parsed (nothing to engrave).');\n  }\n\n  if (!/^\\s*X\\s*:/m.test(notation)) errors.push('Missing required X: (tune number) header.');\n  if (!/^\\s*K\\s*:/m.test(notation)) errors.push('Missing required K: (key) header.');\n  if (!/^\\s*M\\s*:/m.test(notation) && !/\\[M:/.test(notation)) warnings.push('No M: (meter) header; defaulting to 4/4.');\n  if (!/^\\s*L\\s*:/m.test(notation) && !/\\[L:/.test(notation)) warnings.push('No L: (default note length) header.');\n  return { valid: errors.length === 0, errors, warnings };\n}\n\nreturn $input.all().map((item) => {\n  const body = item.json.body || item.json;\n  return { json: validate(body.notation || '') };\n});\n"
+      },
+      "id": "n02",
+      "name": "Validate ABC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "n03",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate ABC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate ABC": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "pi-music-agent",
+    "description": "Validation-only service. POST { notation } -> { valid, errors[], warnings[] }. Used by `validation.backend: n8n`."
+  },
+  "tags": [
+    {
+      "id": "pimusictag0001",
+      "name": "pi-music-agent"
+    }
+  ]
+}

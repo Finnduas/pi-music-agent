@@ -26,9 +26,10 @@ There are **two agents** and one rule.
 │  analyze · gaps · transpose    composer ⇄ validator ⇄ critic        │
 │  validate · render · store     (OpenRouter → Kimi K2.6)             │
 └───────────────┬──────────────────────────────────────────────────────┘
-                │ optional HTTP
-┌───────────────▼───────────── n8n ────────────────────────────────────┐
-│  validation webhook · OMR (sheet music → ABC) webhook                │
+        ▲ HTTP (serve) │ HTTP (webhooks)
+┌───────┴───────▼───────────── n8n (optional) ─────────────────────────┐
+│  inbox: drop a file in .input → convert → fill gaps → viewer         │
+│  compose webhook · validation service · OMR (scan → ABC) service     │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -46,6 +47,8 @@ converted to/from ABC.
 ```
 src/
   cli.ts                 Entry point. One sub-command per capability (see §3).
+  server.ts              Local HTTP API (`serve`) so n8n can drive the agent.
+  ops.ts                 Operations shared by the CLI and the server (convert, transpose).
   config.ts              Loads config.yaml, resolves API keys (config → env →
                          ~/.pi/agent/auth.json), sanitises values.
   types.ts               Shared types (ComposeRequest, ComposeResult, …).
@@ -53,7 +56,6 @@ src/
   loop/
     orchestrator.ts      THE agent loop: compose|edit → validate → critique →
                          revise → render → store.  (composePiece)
-    session.ts           Interactive REPL (/edit /critique /transpose /save …).
     tools.ts             Two tools the composer LLM may call itself:
                          analyze_score, transpose.
 
@@ -71,19 +73,19 @@ src/
 
   validate/
     validator.ts         Validation: local abcjs parse  OR  n8n webhook.
-    n8n-workflow.json    Importable n8n workflow (validation).
 
   convert/
     convert.ts           Sheet music (PDF/image/MusicXML) → ABC via n8n or local
                          Audiveris+music21; ABC passes straight through.
-    n8n-omr-workflow.json  Importable n8n workflow (OMR).
 
-  render/renderer.ts     ABC → HTML viewer (abcjs, offline) + optional SVG.
-  store/store.ts         Saves .json record + index.jsonl (optional SQLite).
+  render/renderer.ts     ABC → one self-contained HTML viewer (abcjs: notation,
+                         Play, Download MIDI, Print / Save PDF).
+  store/store.ts         One .json record per piece in .output/.
 
 prompts/                 composer.md, critic.md — the LLM system prompts.
 pi-integration/          sheet-music.ts (Pi extension) + skills/sheet-music/.
-scripts/                 n8n workflow generators + offline smoke tests.
+n8n/                     Importable n8n workflows (+ code/ = their JavaScript) and a README.
+scripts/                 gen-n8n.mjs (builds n8n/*.json), smoke tests, live checks.
 examples/  .input/  .output/  docs/
 ```
 
@@ -121,7 +123,7 @@ tells it not to use them on the music agent's own code for music tasks.
 ### Slash commands (you type these in Pi)
 
 `/compose`, `/music-edit`, `/music-analyze`, `/music-transpose`, `/music-convert`,
-`/music-render`, `/music-validate`, `/music-list`, `/music` (status).
+`/music-list`, `/music` (status).
 
 ### Tools the *composer LLM* itself can call (inside the music agent)
 
@@ -131,7 +133,8 @@ facts into the prompt as a "Score facts" block, so quality does not depend on it
 
 ### CLI (what everything above shells out to)
 
-`compose · edit · analyze · transpose · convert · validate · render · list · show · session · config`
+`compose · edit · analyze · transpose · convert · validate · render · list · serve · config`
+(full reference: [USAGE.md](USAGE.md#command-reference))
 
 ### How to use it in Pi
 
@@ -161,7 +164,7 @@ Example: `examples/input/minuet-with-gap.abc`, 3/4 in G major, where bars 5–6 
 | 10 | **orchestrator** | Re-runs gap detection → logs *"Remaining candidate gaps: none"*. |
 | 11 | **validator** | abcjs parses the result (or the n8n webhook, if configured). If invalid, errors go back to the composer, up to `maxValidationRetries` (5). |
 | 12 | **Critic LLM** | Scores 0–10 with strengths/issues/suggestions. If score ≥ `scoreThreshold` (8) → stop. Otherwise a *revise* pass runs (with "change nothing outside the edited passage") and we loop, up to `maxIterations` (3). |
-| 13 | **renderer + store** | Writes `.output/<title>-<id>.abc`, `.html` (offline viewer), a `.json` record, and appends `index.jsonl`. |
+| 13 | **renderer + store** | Writes `.output/<title>-<id>.abc`, `.html` (offline viewer) and a `.json` record. |
 | 14 | **Extension → Pi** | Returns title, critic score, file paths and the ABC to Pi. |
 | 15 | **Pi → You** | "The gap in bars 5–6 has been filled with `B c d | e d c |` … output files: …" |
 
@@ -183,38 +186,62 @@ Offline test of this exact flow: `npx tsx scripts/smoke-edit.ts`.
 
 ## 5. n8n: what it does here
 
-n8n is an **optional external service** with a deliberately small role. It runs
-two importable webhook workflows. It contains **no LLM, no loop, no storage**.
+n8n is **optional**, and the integration runs in **both directions**. The workflows
+live in [`n8n/`](../n8n/) (generated by `npm run gen:n8n`; setup in
+[n8n/README.md](../n8n/README.md)). n8n holds **no LLM, no state**: every decision is
+made by the agent; n8n is the plumbing and the automation.
 
 ```
-music agent ──HTTP POST──► n8n Webhook ──► Code node ──► Respond to Webhook ──► JSON back
+ agent → n8n   (the agent calls a webhook for a service)
+   music-agent ──POST──► n8n webhook ──► Code node ──► JSON back
+        validation.backend: n8n          conversion.backend: n8n
+
+ n8n → agent   (n8n triggers and orchestrates the agent)
+   file dropped in .input ─► n8n ──POST──► music-agent serve  (127.0.0.1:7878)
+   HTTP request           ─► n8n ──POST──►   /analyze /edit /compose /convert …
 ```
 
-| | Validation workflow | OMR workflow |
-|---|---|---|
-| File | `src/validate/n8n-workflow.json` | `src/convert/n8n-omr-workflow.json` |
-| Generator | `npm run gen:n8n` | `npm run gen:n8n:omr` |
-| Webhook path | `/webhook/notation-validation` | `/webhook/omr-conversion` |
-| Request | `{ notation, title?, style? }` | `{ filename, mimeType, data(base64) }` |
-| Response | `{ valid, errors[], warnings[] }` | `{ abc, valid, errors[], warnings[] }` |
-| Nodes | Webhook → Code (abcjs / structural checks) → Respond | Webhook → Code (Audiveris → MusicXML → music21 → ABC) → Respond |
-| Used by | `validator.ts` (every compose/edit/revise cycle) | `convert.ts` (`convert` command / `sheetmusic_convert`) |
-| Switch on | `validation.backend: n8n` | `conversion.backend: n8n` |
+| Workflow | Direction | Trigger | What it does |
+|---|---|---|---|
+| **Sheet Music Inbox** (`inbox.json`) | n8n → agent | a new file in `.input` (Local File Trigger) | scan/MusicXML → `/convert`; then `/analyze`; if gaps → `/edit` "fill in the gap in …"; ends in a status report. `.abc` goes straight to analyze; other files are ignored |
+| **Compose a Piece** (`compose-webhook.json`) | n8n → agent | `POST /webhook/compose-piece` | `{ request, style?, title?, refs? }` → `/compose` → the piece (abc, score, files). Errors come back as clean JSON with HTTP 400 |
+| **Notation Validation Service** (`validation.json`) | agent → n8n | `POST /webhook/notation-validation` | abcjs `parseOnly` + header checks → `{ valid, errors[], warnings[] }`. Same verdicts as the local validator |
+| **OMR Conversion Service** (`omr-conversion.json`) | agent → n8n | `POST /webhook/omr-conversion` | base64 scan → Audiveris → MusicXML → music21 → ABC |
 
-- **Default is no n8n.** `validation.backend: local` parses with abcjs in-process;
-  `conversion.backend: none`. The system works fully without n8n.
-- **Why n8n at all?** It is the project's required "validation as a service"
-  boundary, and the natural place to bolt on heavyweight OMR tools (Audiveris,
-  music21) without putting them inside the agent. Swap or extend the workflow
-  visually without touching agent code.
-- **Failure behaviour:** an unreachable webhook yields a clear
-  `n8n webhook unreachable` validation error rather than a crash.
-- **Tested offline** with a mock webhook: `scripts/smoke-n8n.ts`.
-- **Not yet live-tested:** the OMR workflow against a real n8n + Audiveris
-  install (the contract and error handling are tested with mocks; the setup is in
-  `scripts/install-tools.md`).
+**The inbox flow** (each box is a node):
 
-Setup steps: [USAGE.md → n8n validation service](USAGE.md#n8n-validation-service-optional).
+```
+New file in .input → Classify (abc / scan / ignore) → Is it a scan?
+     scan ─► Convert scan to ABC (/convert) ─► Converted? ─no─► Conversion failed (report)
+                                                    │yes
+     abc  ───────────────────────────────────────► Analyze (/analyze) ─► Has gaps?
+                                                         yes ─► Fill the gaps (/edit) ─► Report: gaps filled
+                                                         no  ─► Report: nothing to do
+```
+
+**The API** (`music-agent serve`, `src/server.ts`): `GET /health`,
+`POST /analyze | /compose | /edit | /transpose | /convert`. It binds to
+`127.0.0.1` only, takes JSON, and only accepts file paths *inside the project
+folder* (`../` and outside absolute paths get HTTP 400). Why HTTP and not "run a shell
+command" nodes: webhook input (a composition request) would otherwise end up in a shell
+command line.
+
+**Defaults:** no n8n needed. `validation.backend: local`, `conversion.backend: none`.
+
+**How it was tested.**
+- Offline (`npm run smoke`): the validation client against a mock webhook
+  (`smoke-n8n.ts`) and every API route/error/path-safety case (`smoke-server.ts`).
+- **Against a real n8n 1.123** (`npm run check:n8n`, manual run): validation verdicts
+  identical to the local validator on 4 cases; compose webhook (error path and a real
+  composition, 20 s); inbox with 4 real files dropped in `.input` (complete piece →
+  "no gaps", scan without a backend → clear error, `.txt` → ignored, piece with a gap →
+  filled, only bars 5–6 changed, viewer rendered); OMR webhook → Audiveris missing → clean
+  structured error. Running it for real found two bugs the mocks could not
+  (abcjs needed `parseOnly`, not `renderAbc`, in n8n's sandbox; a bracket-count heuristic
+  rejected every piece ending in `|]`), both fixed.
+- **Not tested:** real score recognition (needs Audiveris + music21 installed; the plumbing
+  around it is tested), n8n 2.x (needs Node 24; this was verified on 1.123 with
+  `N8N_RUNNERS_ENABLED=false`).
 
 ---
 
@@ -225,9 +252,7 @@ Setup steps: [USAGE.md → n8n validation service](USAGE.md#n8n-validation-servi
 | **OpenRouter** | LLM gateway; default model `moonshotai/kimi-k2.6` (open weights) for composer and critic | yes (or Ollama) |
 | **Ollama** | Local LLM alternative | no |
 | **abcjs** (npm) | ABC parsing for validation + in-browser rendering | yes (bundled) |
-| **abc2svg / abcm2ps** | Optional SVG engraving | no |
-| **better-sqlite3** | Optional SQLite index | no |
-| **n8n** | Validation + OMR webhooks (§5) | no |
+| **n8n** | Automation: inbox, compose webhook, validation + OMR services (§5). Fair-code licence, not OSI open source | no |
 | **Audiveris + music21** | OMR toolchain used by the OMR workflow / local backend | only for PDF/image → ABC |
 | **Pi** | Base agent that drives everything | for the chat experience |
 

@@ -1,0 +1,452 @@
+{
+  "id": "pimusic3",
+  "versionId": "00000000-0000-4000-8000-000000000003",
+  "active": false,
+  "name": "Sheet Music Inbox",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerOn": "folder",
+        "path": "./.input",
+        "events": [
+          "add"
+        ],
+        "options": {
+          "awaitWriteFinish": true
+        }
+      },
+      "id": "n07",
+      "name": "New file in .input",
+      "type": "n8n-nodes-base.localFileTrigger",
+      "typeVersion": 1,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Decide what to do with a new file in .input. Anything else is ignored.\nconst SCAN = /\\.(pdf|png|jpe?g|tiff?|bmp|gif|musicxml|xml|mxl)$/i;\nconst out = [];\nfor (const item of $input.all()) {\n  const file = String(item.json.path || '');\n  const kind = /\\.abc$/i.test(file) ? 'abc' : SCAN.test(file) ? 'scan' : 'ignore';\n  if (kind !== 'ignore') out.push({ json: { file, kind } });\n}\nreturn out;"
+      },
+      "id": "n08",
+      "name": "Classify file",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "n09",
+              "leftValue": "={{ $json.kind }}",
+              "rightValue": "scan",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n10",
+      "name": "Is it a scan?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        640,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:7878/convert",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ file: $json.file }) }}",
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "n11",
+      "name": "Convert scan to ABC",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        860,
+        180
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "n12",
+              "leftValue": "={{ $json.valid }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n13",
+      "name": "Converted?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n14",
+              "name": "status",
+              "value": "conversion failed",
+              "type": "string"
+            },
+            {
+              "id": "n15",
+              "name": "details",
+              "value": "={{ ($json.errors || [$json.error && ($json.error.message || $json.error)]).join('; ') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n16",
+      "name": "Conversion failed",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1300,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:7878/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ file: $json.file }) }}",
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "n17",
+      "name": "Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        80
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "n18",
+              "leftValue": "={{ $json.gaps.length }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "n19",
+      "name": "Has gaps?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1520,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:7878/edit",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ file: $json.file, instruction: 'fill in the gap in ' + $json.gaps.join('; ') }) }}",
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "n20",
+      "name": "Fill the gaps",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1740,
+        0
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n21",
+              "name": "status",
+              "value": "={{ $json.error ? 'edit failed' : 'gaps filled' }}",
+              "type": "string"
+            },
+            {
+              "id": "n22",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "n23",
+              "name": "critic score",
+              "value": "={{ $json.score }}",
+              "type": "string"
+            },
+            {
+              "id": "n24",
+              "name": "files",
+              "value": "={{ ($json.files || []).join(', ') }}",
+              "type": "string"
+            },
+            {
+              "id": "n25",
+              "name": "details",
+              "value": "={{ $json.error || $json.summary }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n26",
+      "name": "Report: gaps filled",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1960,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "n27",
+              "name": "status",
+              "value": "no gaps found",
+              "type": "string"
+            },
+            {
+              "id": "n28",
+              "name": "file",
+              "value": "={{ $json.file }}",
+              "type": "string"
+            },
+            {
+              "id": "n29",
+              "name": "details",
+              "value": "={{ $json.bars }} bars, key {{ $json.key }}, meter {{ $json.meter }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n30",
+      "name": "Report: nothing to do",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1740,
+        160
+      ]
+    }
+  ],
+  "connections": {
+    "New file in .input": {
+      "main": [
+        [
+          {
+            "node": "Classify file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify file": {
+      "main": [
+        [
+          {
+            "node": "Is it a scan?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is it a scan?": {
+      "main": [
+        [
+          {
+            "node": "Convert scan to ABC",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert scan to ABC": {
+      "main": [
+        [
+          {
+            "node": "Converted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Converted?": {
+      "main": [
+        [
+          {
+            "node": "Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Conversion failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze": {
+      "main": [
+        [
+          {
+            "node": "Has gaps?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has gaps?": {
+      "main": [
+        [
+          {
+            "node": "Fill the gaps",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report: nothing to do",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fill the gaps": {
+      "main": [
+        [
+          {
+            "node": "Report: gaps filled",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "pi-music-agent",
+    "description": "Drop a file in .input: scans are converted to ABC, gaps are found and filled, a viewer is rendered into .output. Needs `music-agent serve`."
+  },
+  "tags": [
+    {
+      "id": "pimusictag0001",
+      "name": "pi-music-agent"
+    }
+  ]
+}

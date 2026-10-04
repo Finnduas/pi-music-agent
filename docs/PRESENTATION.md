@@ -31,7 +31,7 @@ You → Pi (base agent) → sheetmusic_* tools → pi-music-agent CLI → LLM ·
 Three ideas to land:
 
 1. **ABC notation is the intermediate language** — plain text an LLM can read/write
-   and a parser can verify. PDF/image → ABC → HTML/SVG.
+   and a parser can verify. PDF/image → ABC → HTML viewer.
 2. **Pi is the brain, the music agent is a fixed tool.** Pi never edits the music
    agent's code during music tasks (enforced by a skill).
 3. **Deterministic code does what code does well** (analysis, gap detection,
@@ -49,11 +49,18 @@ compose|edit → validate ⇄ fix → critic (0–10) → revise → render → 
 
 ## 5. Where n8n fits (2 min)
 
-- Two webhook workflows: **validation** and **sheet-music → ABC (OMR)**.
-- No LLM and no state in n8n; the agent calls it over HTTP.
-- Optional: defaults work with zero n8n. Flip `validation.backend: n8n` to use it.
-- Why: validation-as-a-service boundary + a visual place to hang heavy OMR tools
-  (Audiveris, music21) outside the agent.
+n8n works in **both directions**; it holds no LLM and no state.
+
+- **n8n drives the agent** (via `music-agent serve`, a local HTTP API):
+  - **Inbox:** drop a file in `.input/` → scans are converted, gaps are filled, a viewer
+    is rendered. Show the workflow canvas: it reads like the process.
+  - **Compose webhook:** `POST /webhook/compose-piece` → a piece. Anything that can send an
+    HTTP request (a form, a bot) can use the agent.
+- **The agent calls n8n** for two services: **validation** and **scanned music → ABC**.
+- Optional: defaults work with zero n8n.
+- Why: automation and glue stay visual and editable without touching agent code; the
+  heavy OMR tools (Audiveris, music21) stay outside the agent.
+- Safety: the API is localhost-only and refuses paths outside the project.
 
 ## 6. LIVE DEMO (6 min)
 
@@ -68,6 +75,7 @@ and a browser ready.
 | 3 | *"Rewrite examples/input/ode-to-joy.abc in F major"* | `analyze` → compute 5 semitones → `sheetmusic_transpose` (instant, no LLM) |
 | 4 | *"Write me a short minuet in the style of the pieces in examples/input"* | `sheetmusic_compose` with references; ~1–2 min |
 | 5 | *"What key is .output/….abc in?"* | `sheetmusic_analyze` only — free |
+| 6 | (n8n open, `serve` running) copy `examples/input/minuet-with-gap.abc` into `.input/` | the *Sheet Music Inbox* executes: classify → analyze → fill the gaps → report; new files in `.output/` |
 
 *Tips:* the compose/edit calls take 30–90 s (two LLM calls per round) — talk
 through the loop while waiting. Run step 1 once before the talk as a backup and
@@ -79,12 +87,14 @@ offline with fake LLMs and prints PASS lines; show `examples/output/` instead.
 
 ## 7. Trust & testing (1 min)
 
-- `npm run smoke`: 8 offline suites (analysis, transposition + abcjs-MIDI oracle, render, convert, full loop,
-  edit/gap-fill, n8n mock) — no API key.
+- `npm run smoke`: 9 offline suites (analysis, transposition + abcjs-MIDI oracle, render, convert, full loop,
+  edit/gap-fill, n8n client mock, HTTP API) — no API key.
+- `npm run check:n8n`: against a **real n8n** — validation verdicts match the local validator,
+  compose webhook, inbox with real dropped files. (It found two bugs the mocks could not.)
 - Real LLM and real Pi runs verified end-to-end.
 - Honest limits: gap-finder is a heuristic; musical quality is "plausible and in
-  key" (critic scored 7–7.3/10); OMR (PDF → ABC) is wired and mock-tested but needs
-  Audiveris + n8n installed to run for real.
+  key" (critic scored 7–7.3/10); reading a scanned PDF is wired through n8n and fails
+  cleanly without Audiveris, but real recognition is untested (needs Audiveris + music21).
 
 ## 8. What I learned / design choices (1 min)
 
@@ -109,7 +119,8 @@ abcjs validator.
 deterministic code. Same for counting bars and finding gaps.
 
 **Can it read a PDF?** Via the OMR workflow (Audiveris → MusicXML → music21 → ABC)
-in n8n or locally. Not live-tested end-to-end yet — it is mock-tested.
+in n8n or locally. The plumbing is tested against a real n8n; real recognition needs
+Audiveris + music21 installed and is untested.
 
 **Which model, and is it open source?** `moonshotai/kimi-k2.6` through OpenRouter, for both
 Pi and the music agent. The weights are open (modified MIT: attribution only above 100M

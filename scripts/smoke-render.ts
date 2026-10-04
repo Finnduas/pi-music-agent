@@ -29,29 +29,13 @@ async function exists(p: string): Promise<boolean> {
 async function main() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "music-agent-render-"));
 
-  // HTML viewer is produced even with no SVG engine installed.
   const html = await renderAbc({
     abc: ABC,
     outDir: dir,
     baseName: "render-test",
-    prefer: [],
-    formats: ["html"],
-    abc2svgPath: "abc2svg",
-    abcm2psPath: "abcm2ps",
   });
   const htmlPath = path.join(dir, "render-test.html");
   const page = await fs.readFile(htmlPath, "utf8");
-
-  // Unsupported formats must raise warnings, not be silently dropped.
-  const warn = await renderAbc({
-    abc: ABC,
-    outDir: dir,
-    baseName: "render-warn",
-    prefer: [],
-    formats: ["html", "pdf", "midi", "bogus"],
-    abc2svgPath: "abc2svg",
-    abcm2psPath: "abcm2ps",
-  });
 
   const checks: [string, boolean][] = [
     ["html viewer written", html.files.includes(htmlPath)],
@@ -65,15 +49,6 @@ async function main() {
     ["viewer plays via the abcjs synth", page.includes("ABCJS.synth.CreateSynth")],
     ["viewer has Download MIDI control", page.includes("Download MIDI")],
     ["viewer keeps the rendered tune for playback", page.includes("tune = ABCJS.renderAbc(")],
-    [
-      "pdf format warns (use viewer print)",
-      warn.warnings.some((w) => w.includes("Print / Save PDF")),
-    ],
-    [
-      "midi format warns (points to viewer Play / Download MIDI)",
-      warn.warnings.some((w) => w.includes("Download MIDI")),
-    ],
-    ["unknown format warns", warn.warnings.some((w) => w.includes("bogus"))],
   ];
 
   console.log("\n--- render checks ---");

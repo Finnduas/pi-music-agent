@@ -13,7 +13,7 @@ and report the results. Do not modify files under the music agent's `src/`,
 ## Folders
 
 - `.input/` — drop source sheet music here (PDF, image, MusicXML, or ABC).
-- `.output/` — rendered pieces land here (`.abc`, `.svg`, `.html` + viewer).
+- `.output/` — rendered pieces land here (`.abc` and an `.html` viewer with Play / MIDI / Print).
 
 ## Slash commands (preferred, available in Pi)
 
@@ -22,8 +22,6 @@ and report the results. Do not modify files under the music agent's `src/`,
 - `/music-analyze <file>` — bars, meter, key, tonic, voices.
 - `/music-edit <file> <instruction>` — change an existing piece ("fill in the gap").
 - `/music-transpose <file> <semitones>` — "rewrite in F major" style.
-- `/music-render <file>` — ABC → printable HTML/SVG.
-- `/music-validate <file>` — check an ABC file.
 - `/music-convert <file>` — sheet music (PDF/image) → ABC.
 
 ## Model tools (you may call directly)

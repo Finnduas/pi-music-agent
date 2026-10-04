@@ -12,7 +12,7 @@ cd pi-music-agent
 npm install
 cp config.example.yaml config.yaml   # optional; defaults work out of the box
 npm run typecheck
-npm run smoke                        # offline loop + n8n mock, no API key needed
+npm run smoke                        # offline suites (loop, n8n mock, HTTP API), no API key needed
 ```
 
 You do **not** need an API key to develop: the smoke tests inject fake LLM roles

@@ -6,8 +6,7 @@
 # Where source sheets are dropped and rendered pieces are written.
 storage:
   inputDir: "./.input"        # drop PDF/image sheet music or ABC here
-  dir: "./.output"            # rendered .abc / .svg / .html outputs
-  # database: "./.output/index.db"   # uncomment to use SQLite index
+  dir: "./.output"            # rendered .abc / .html outputs
 
 # -------- LLM providers: one OpenAI-compatible client, switchable base_url --
 providers:
@@ -56,19 +55,12 @@ validation:
 # -------- Sheet music -> ABC conversion (OMR stretch goal) -------------------
 conversion:
   backend: "none"            # "none" | "n8n" | "local"
-  n8n:                       # import src/convert/n8n-omr-workflow.json into n8n
+  n8n:                       # import n8n/omr-conversion.json into n8n
     webhookUrl: "http://localhost:5678/webhook/omr-conversion"
     timeoutMs: 120000
   local:                     # "local" needs Audiveris + Python music21 installed
     audiveris: "audiveris"
     music21: "python"
-
-# -------- Rendering ---------------------------------------------------------
-render:
-  prefer: ["abc2svg", "abcm2ps"]   # CLI tools tried in order (if installed)
-  formats: ["svg", "html"]         # abcjs HTML viewer is always available
-  abc2svgPath: "abc2svg"           # override with an absolute path if needed
-  abcm2psPath: "abcm2ps"
 
 # -------- Agent loop limits ------------------------------------------------
 loop:

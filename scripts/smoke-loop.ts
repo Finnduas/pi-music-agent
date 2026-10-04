@@ -30,9 +30,8 @@ C2 E2 G2 c2 | G8 | A2 F2 E2 D2 | C8 |]`;
 async function main() {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "music-agent-smoke-"));
   const cfg = loadConfig();
-  cfg.storage = { dir }; // no sqlite
+  cfg.storage = { dir };
   cfg.validation.backend = "local";
-  cfg.render.formats = ["html"]; // avoid needing an SVG engine
   cfg.loop = { maxValidationRetries: 5, maxIterations: 3, scoreThreshold: 8 };
 
   let composerCalls = 0;
@@ -97,7 +96,6 @@ async function main() {
     ["final critic score is 9", result.critic?.score === 9],
     ["final ABC is the revised one", result.abc.includes("(revised)")],
     ["at least one file rendered", result.files.length >= 1],
-    ["index.jsonl written", await exists(path.join(dir, "index.jsonl"))],
     ["record json written", await exists(path.join(dir, `${result.id}.json`))],
     ["critic receives deterministic score facts", lastCriticUser.includes("Score facts")],
   ];

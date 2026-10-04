@@ -59,6 +59,27 @@ cp pi-integration/skills/sheet-music/references/* ~/.pi/agent/skills/sheet-music
 
 Start `pi` (or run `/reload`) and type `/music`. Details: [pi-integration/README.md](pi-integration/README.md).
 
+## Commands
+
+| Command | Does | LLM? |
+|---|---|---|
+| `compose "<request>"` | write a new piece (`--style`, `--refs <folder>`) | yes |
+| `edit <file> "<instruction>"` | change a piece, e.g. fill a gap | yes |
+| `analyze <file>` | bars, key, meter, voices, gaps | no |
+| `transpose <n> <file>` | move by n semitones, exact | no |
+| `convert <file>` | PDF / image / MusicXML → ABC | no |
+| `validate <file>` · `render <file>` · `list` · `config` | check, make the viewer, list, show settings | no |
+| `serve` | local HTTP API so **n8n** can drive the agent | – |
+
+Every option is in the [command reference](docs/USAGE.md#command-reference).
+
+## n8n (optional automation)
+
+`n8n/` has four importable workflows: an **inbox** (drop a file in `.input/`: scans are
+converted, gaps are filled, a viewer is rendered), a **compose webhook** (`POST` a request,
+get a piece), and the **validation** and **scanned-music** services the agent can call.
+Setup and tests: [n8n/README.md](n8n/README.md).
+
 ## How it works, in one picture
 
 ```
@@ -71,7 +92,7 @@ request / existing ABC
    ▼  critic LLM ── score < threshold ──► revise ──► validate
    │ good enough
    ▼
- render (HTML viewer, optional SVG) ─► store in .output/
+ render (HTML viewer) ─► store in .output/
 ```
 
 ## Folders
@@ -84,13 +105,15 @@ request / existing ABC
 | `prompts/` | composer and critic system prompts |
 | `pi-integration/` | Pi extension + skill |
 | `examples/` | public-domain demo inputs and sample outputs |
-| `scripts/` | n8n workflow generators and offline smoke tests |
+| `n8n/` | importable n8n workflows + how to run them |
+| `scripts/` | n8n generator, offline smoke tests, live checks |
 | `docs/` | architecture, usage reference, presentation |
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — modules, tools, n8n, and a step-by-step walkthrough of "fill in the gap".
-- [docs/USAGE.md](docs/USAGE.md) — full CLI, configuration, rendering, storage reference.
+- [docs/USAGE.md](docs/USAGE.md) — every command, the HTTP API, configuration, storage.
+- [n8n/README.md](n8n/README.md) — the n8n workflows: setup, use, checks.
 - [docs/PRESENTATION.md](docs/PRESENTATION.md) — talk outline and live-demo script.
 - [examples/README.md](examples/README.md) — demo files.
 

@@ -1,0 +1,106 @@
+{
+  "id": "pimusic4",
+  "versionId": "00000000-0000-4000-8000-000000000004",
+  "active": false,
+  "name": "Compose a Piece (webhook)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "compose-piece",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "n31",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "compose-piece"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:7878/compose",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ request: $json.body.request, style: $json.body.style, title: $json.body.title, refs: $json.body.refs }) }}",
+        "options": {
+          "timeout": 600000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "n32",
+      "name": "Compose",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {
+          "responseCode": "={{ $json.error ? 400 : 200 }}"
+        }
+      },
+      "id": "n33",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Compose",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compose": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "pi-music-agent",
+    "description": "POST /webhook/compose-piece { request, style?, title?, refs? } -> the composed piece (abc, score, files). Needs `music-agent serve`."
+  },
+  "tags": [
+    {
+      "id": "pimusictag0001",
+      "name": "pi-music-agent"
+    }
+  ]
+}

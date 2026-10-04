@@ -29,7 +29,6 @@ export interface AppConfig {
   storage: {
     dir: string;
     inputDir?: string;
-    database?: string;
   };
   providers: Record<ProviderName, ProviderConfig>;
   roles: {
@@ -44,12 +43,6 @@ export interface AppConfig {
     backend: "none" | "local" | "n8n";
     n8n: { webhookUrl: string; timeoutMs: number };
     local: { audiveris: string; music21: string };
-  };
-  render: {
-    prefer: string[];
-    formats: string[];
-    abc2svgPath: string;
-    abcm2psPath: string;
   };
   loop: {
     maxValidationRetries: number;
@@ -100,12 +93,6 @@ const DEFAULTS: AppConfig = {
       timeoutMs: 120000,
     },
     local: { audiveris: "audiveris", music21: "python" },
-  },
-  render: {
-    prefer: ["abc2svg", "abcm2ps"],
-    formats: ["svg", "html"],
-    abc2svgPath: "abc2svg",
-    abcm2psPath: "abcm2ps",
   },
   loop: { maxValidationRetries: 5, maxIterations: 3, scoreThreshold: 8 },
 };

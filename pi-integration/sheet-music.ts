@@ -131,7 +131,7 @@ export default function (pi: ExtensionAPI) {
       ].join("\n");
       return {
         content: [{ type: "text", text }],
-        details: { id: rec.id, title: rec.title, score: rec.critic?.score, files: rec.files, abc: rec.abc, engine: rec.engine },
+        details: { id: rec.id, title: rec.title, score: rec.critic?.score, files: rec.files, abc: rec.abc },
       };
     },
   });
@@ -264,7 +264,7 @@ ${r.stderr}` }], details: { error: r.stderr } };
     description: "Show sheet-music agent status and commands",
     handler: async (_args, ctx) => {
       const dir = MUSIC_DIR ?? "(not found — set MUSIC_AGENT_DIR)";
-      notify(ctx, `pi-music-agent: ${dir}\nCommands: /compose /music-edit /music-list /music-analyze /music-transpose /music-render /music-validate /music-convert`, "info");
+      notify(ctx, `pi-music-agent: ${dir}\nCommands: /compose /music-edit /music-analyze /music-transpose /music-convert /music-list`, "info");
     },
   });
 
@@ -298,7 +298,7 @@ ${r.stderr}` }], details: { error: r.stderr } };
   pi.registerCommand("music-edit", {
     description: "Edit a score with an instruction, e.g. /music-edit .input/piece.abc fill in the gap",
     handler: async (args, ctx) => {
-      const m = /^(S+)s+(.+)$/.exec(args.trim());
+      const m = /^(\S+)\s+(.+)$/.exec(args.trim());
       if (!m) return notify(ctx, "usage: /music-edit <file> <instruction>", "warning");
       notify(ctx, "Editing… (edit -> validate -> critique -> render)", "info");
       const r = await runCli(pi, ["edit", resolveFile(m[1]), m[2], "--json"], { timeout: 600000 });
@@ -309,24 +309,6 @@ ${r.stderr}` }], details: { error: r.stderr } };
       } catch {
         notify(ctx, r.stdout || "No output.", "warning");
       }
-    },
-  });
-
-  pi.registerCommand("music-render", {
-    description: "Render an ABC file to sheet music (HTML/SVG)",
-    handler: async (args, ctx) => {
-      if (!args.trim()) return notify(ctx, "usage: /music-render <file>", "warning");
-      const r = await runCli(pi, ["render", resolveFile(args.trim())]);
-      notify(ctx, r.ok ? r.stdout.trim() : r.stderr, r.ok ? "info" : "error");
-    },
-  });
-
-  pi.registerCommand("music-validate", {
-    description: "Validate an ABC file",
-    handler: async (args, ctx) => {
-      if (!args.trim()) return notify(ctx, "usage: /music-validate <file>", "warning");
-      const r = await runCli(pi, ["validate", resolveFile(args.trim())]);
-      notify(ctx, r.ok ? r.stdout.trim() : `${r.stdout}\n${r.stderr}`, r.ok ? "info" : "warning");
     },
   });
 

@@ -50,7 +50,10 @@ the music tool's code, it says so and switches to normal code-editing.
 ## Slash commands
 
 `/music` · `/compose` · `/music-edit` · `/music-analyze` · `/music-transpose` ·
-`/music-convert` · `/music-render` · `/music-validate` · `/music-list`
+`/music-convert` · `/music-list`
+
+To render or validate a hand-written ABC file, ask Pi, or run
+`node dist/cli.js render <file>` / `validate <file>` yourself.
 
 **Tip: style references.** To compose "in the style of" a folder, the slash command is
 reliable: `/compose --refs examples/input a short minuet`. When you only *say* it, the model

@@ -32,7 +32,6 @@ const dir = await fs.mkdtemp(path.join(os.tmpdir(), "music-agent-edit-"));
 const cfg = loadConfig();
 cfg.storage = { dir };
 cfg.validation.backend = "local";
-cfg.render.formats = ["html"];
 cfg.loop = { maxValidationRetries: 3, maxIterations: 2, scoreThreshold: 7 };
 
 let composerUser = "";

@@ -6,9 +6,9 @@
  * Run: npx tsx scripts/smoke-n8n.ts
  */
 import http from "node:http";
+import type { AddressInfo } from "node:net";
 import { createValidator } from "../src/validate/validator.js";
 
-const PORT = 5678;
 const PATH = "/webhook/notation-validation";
 
 const server = http.createServer((req, res) => {
@@ -34,7 +34,8 @@ const server = http.createServer((req, res) => {
 });
 
 async function main() {
-  await new Promise<void>((r) => server.listen(PORT, r));
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", r)); // any free port
+  const PORT = (server.address() as AddressInfo).port;
   const validator = createValidator({
     backend: "n8n",
     n8n: { webhookUrl: `http://localhost:${PORT}${PATH}`, timeoutMs: 5000 },

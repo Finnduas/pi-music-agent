@@ -1,14 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 Finnduas
-/** Render ABC -> SVG/PDF (abc2svg/abcm2ps CLI) and a self-contained abcjs HTML viewer. */
+/** Render ABC -> a self-contained abcjs HTML viewer (notation + Play + Download MIDI). */
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import { createRequire } from "node:module";
 import fs from "node:fs/promises";
 import path from "node:path";
 
-const exec = promisify(execFile);
 const require = createRequire(import.meta.url);
 
 /** Best-effort: copy abcjs's browser bundle next to the viewer for offline use. */
@@ -28,81 +25,16 @@ export interface RenderOptions {
   abc: string;
   outDir: string;
   baseName: string; // without extension
-  prefer: string[]; // e.g. ["abc2svg", "abcm2ps"]
-  formats: string[]; // "svg" | "html" | "pdf" | "midi"
-  abc2svgPath: string;
-  abcm2psPath: string;
 }
 
 export interface RenderResult {
   files: string[]; // absolute paths written
-  engine: string; // which engine produced the SVG (or "abcjs" for the viewer)
-  warnings: string[];
-}
-
-async function which(bin: string): Promise<string | null> {
-  try {
-    if (process.platform === "win32") {
-      await exec("where", [bin]);
-    } else {
-      await exec("command", ["-v", bin]);
-    }
-    return bin;
-  } catch {
-    return null;
-  }
 }
 
 async function writeFile(p: string, data: string | Buffer): Promise<string> {
   await fs.mkdir(path.dirname(p), { recursive: true });
   await fs.writeFile(p, data);
   return p;
-}
-
-/* --------------------------- CLI engine helpers -------------------------- */
-
-async function renderWithAbc2svg(
-  opts: RenderOptions,
-  bin: string,
-  abcPath: string,
-  svgPath: string,
-): Promise<string | null> {
-  try {
-    // abc2svg reads a file and writes SVG to stdout.
-    const { stdout } = await exec(bin, [abcPath], { maxBuffer: 64 * 1024 * 1024 });
-    if (!stdout.includes("<svg")) return null;
-    await writeFile(svgPath, stdout);
-    return bin;
-  } catch {
-    return null;
-  }
-}
-
-async function renderWithAbcm2ps(
-  opts: RenderOptions,
-  bin: string,
-  abcPath: string,
-  svgPath: string,
-): Promise<string | null> {
-  try {
-    // abcm2ps -g (SVG) -O out.abc -  -> writes out001.svg etc.
-    const stem = svgPath.replace(/\.svg$/, "");
-    await exec(bin, ["-g", "-O", stem + ".abc", abcPath]);
-    // abcm2ps may emit numerical suffixes; normalise.
-    const dir = path.dirname(svgPath);
-    const base = path.basename(stem);
-    const entries = await fs.readdir(dir);
-    const produced = entries.filter((f) => f.startsWith(base) && f.endsWith(".svg")).sort();
-    if (!produced.length) return null;
-    const buf = await fs.readFile(path.join(dir, produced[0]));
-    await writeFile(svgPath, buf);
-    for (const f of produced) {
-      if (path.join(dir, f) !== svgPath) await fs.rm(path.join(dir, f), { force: true });
-    }
-    return bin;
-  } catch {
-    return null;
-  }
 }
 
 /* ----------------------------- abcjs viewer ------------------------------ */
@@ -274,63 +206,13 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
 /* ------------------------------ public API ------------------------------- */
 
 export async function renderAbc(opts: RenderOptions): Promise<RenderResult> {
-  const warnings: string[] = [];
-  const files: string[] = [];
   const abcPath = path.join(opts.outDir, `${opts.baseName}.abc`);
+  const htmlPath = path.join(opts.outDir, `${opts.baseName}.html`);
   await writeFile(abcPath, opts.abc);
-  files.push(abcPath);
-
-  let engine = "none";
-  const svgPath = path.join(opts.outDir, `${opts.baseName}.svg`);
-  const wantSvg = opts.formats.includes("svg");
-
-  if (wantSvg) {
-    for (const pref of opts.prefer) {
-      if (pref === "abc2svg") {
-        const bin = await which(opts.abc2svgPath);
-        if (!bin) continue;
-        const used = await renderWithAbc2svg(opts, bin, abcPath, svgPath);
-        if (used) { engine = used; files.push(svgPath); break; }
-      } else if (pref === "abcm2ps") {
-        const bin = await which(opts.abcm2psPath);
-        if (!bin) continue;
-        const used = await renderWithAbcm2ps(opts, bin, abcPath, svgPath);
-        if (used) { engine = used; files.push(svgPath); break; }
-      }
-    }
-    if (engine === "none") {
-      warnings.push(
-        "No SVG engine found (abc2svg/abcm2ps not installed); wrote HTML viewer only.",
-      );
-    }
-  }
-
-  if (opts.formats.includes("html")) {
-    const vendor = await vendorAbcjs(opts.outDir);
-    const htmlPath = path.join(opts.outDir, `${opts.baseName}.html`);
-    await writeFile(
-      htmlPath,
-      htmlViewer(opts.baseName, opts.abc, vendor ?? "https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js"),
-    );
-    files.push(htmlPath);
-    if (engine === "none") engine = "abcjs";
-  }
-
-  // Surface unsupported formats instead of silently ignoring them.
-  for (const fmt of opts.formats) {
-    if (fmt === "svg" || fmt === "html") continue;
-    if (fmt === "pdf") {
-      warnings.push(
-        'The CLI renderer does not emit PDF; open the HTML viewer and use "Print / Save PDF".',
-      );
-    } else if (fmt === "midi") {
-      warnings.push(
-        'The CLI does not write MIDI files; open the HTML viewer and use "Play" or "Download MIDI".',
-      );
-    } else {
-      warnings.push(`Unknown render format "${fmt}" ignored (supported: svg, html).`);
-    }
-  }
-
-  return { files, engine, warnings };
+  const vendor = await vendorAbcjs(opts.outDir);
+  await writeFile(
+    htmlPath,
+    htmlViewer(opts.baseName, opts.abc, vendor ?? "https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js"),
+  );
+  return { files: [abcPath, htmlPath] };
 }

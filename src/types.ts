@@ -21,7 +21,6 @@ export interface CompositionMeta {
   iterations: number;
   validationWarnings: string[];
   files: string[];
-  engine: string;
   composerModel: string;
   criticModel: string;
   createdAt: string;

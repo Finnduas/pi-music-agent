@@ -298,21 +298,14 @@ export async function composePiece(
   const baseName = slugify(title);
 
   let files: string[] = [];
-  let engine = "none";
   if (!deps.noPersist) {
     say("Rendering...");
     const rendered = await renderAbc({
       abc,
       outDir: cfg.storage.dir,
       baseName: `${baseName}-${id.slice(-6)}`,
-      prefer: cfg.render.prefer,
-      formats: cfg.render.formats,
-      abc2svgPath: cfg.render.abc2svgPath,
-      abcm2psPath: cfg.render.abcm2psPath,
     });
     files = rendered.files;
-    engine = rendered.engine;
-    for (const w of rendered.warnings) say(`Render: ${w}`);
     for (const f of files) say(`Wrote ${f}`);
   } else {
     say("Skipping render/store (dry run).");
@@ -329,7 +322,6 @@ export async function composePiece(
     iterations,
     validationWarnings,
     files,
-    engine,
     composerModel: composerLabel,
     criticModel: criticLabel,
     createdAt: new Date().toISOString(),
