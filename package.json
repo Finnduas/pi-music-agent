@@ -35,6 +35,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gen:n8n": "node scripts/gen-n8n.mjs",
     "smoke": "tsx scripts/smoke-music.ts && tsx scripts/smoke-transpose.ts && tsx scripts/smoke-transpose-oracle.ts && tsx scripts/smoke-render.ts && tsx scripts/smoke-convert.ts && tsx scripts/smoke-loop.ts && tsx scripts/smoke-edit.ts && tsx scripts/smoke-n8n.ts && tsx scripts/smoke-server.ts",
+    "scenario": "node scripts/scenario-live.mjs",
     "check:n8n": "node scripts/check-n8n.mjs",
     "check:browser": "node scripts/check-browser.mjs",
     "serve": "node dist/cli.js serve"
