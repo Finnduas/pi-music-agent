@@ -25,12 +25,12 @@ providers:
 roles:
   composer:
     provider: openrouter
-    model: "anthropic/claude-3.5-sonnet"
+    model: "anthropic/claude-sonnet-4"
     temperature: 0.9
     maxTokens: 4096
   critic:
     provider: openrouter
-    model: "anthropic/claude-3.5-sonnet"
+    model: "anthropic/claude-sonnet-4"
     temperature: 0.2
     maxTokens: 2048
 

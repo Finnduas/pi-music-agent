@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** Minimal OpenAI-compatible chat client (OpenRouter, Ollama, any /v1 server). */
 
 export interface ChatMessage {

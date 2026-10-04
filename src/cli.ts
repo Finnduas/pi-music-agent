@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** CLI entry point for the pi-music-agent harness. */
 
 import { Command } from "commander";

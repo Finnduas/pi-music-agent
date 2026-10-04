@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import fs from "node:fs";
@@ -60,13 +62,13 @@ const DEFAULTS: AppConfig = {
   roles: {
     composer: {
       provider: "openrouter",
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-sonnet-4",
       temperature: 0.9,
       maxTokens: 4096,
     },
     critic: {
       provider: "openrouter",
-      model: "anthropic/claude-3.5-sonnet",
+      model: "anthropic/claude-sonnet-4",
       temperature: 0.2,
       maxTokens: 2048,
     },

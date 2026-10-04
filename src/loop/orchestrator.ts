@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** The agent loop: compose -> validate (retries) -> critique -> iterate -> render -> store. */
 
 import crypto from "node:crypto";

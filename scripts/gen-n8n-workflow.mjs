@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 // Generates src/validate/n8n-workflow.json with a correctly-escaped Code node.
 import fs from "node:fs";
 import path from "node:path";

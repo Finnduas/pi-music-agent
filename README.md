@@ -1,5 +1,9 @@
 # pi-music-agent
 
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178c6.svg)](https://www.typescriptlang.org/)
+[![Node](https://img.shields.io/badge/node-%3E%3D18-339933.svg)](https://nodejs.org/)
+
 A classical-music composition harness in the spirit of the
 [Pi-Agent Brief](docs/pi-agent-harness-brief.md): it composes in **ABC notation**,
 validates every score, critiques it, iterates until it is good enough, renders
@@ -56,8 +60,8 @@ providers:
     baseUrl: "https://openrouter.ai/api/v1"
     apiKey: ""            # leave blank to read OPENROUTER_API_KEY
 roles:
-  composer: { provider: openrouter, model: "anthropic/claude-3.5-sonnet", temperature: 0.9 }
-  critic:   { provider: openrouter, model: "anthropic/claude-3.5-sonnet", temperature: 0.2 }
+  composer: { provider: openrouter, model: "anthropic/claude-sonnet-4", temperature: 0.9 }
+  critic:   { provider: openrouter, model: "anthropic/claude-sonnet-4", temperature: 0.2 }
 ```
 
 The key is read, in order: `config.yaml` → `OPENROUTER_API_KEY` env var → pi's
@@ -192,3 +196,15 @@ and local storage. **Out of scope (by design):** MIDI and audio synthesis.
 
 The stretch goal — sheet music → ABC via Audiveris + music21 in a second n8n
 workflow — is covered in [scripts/install-tools.md](scripts/install-tools.md).
+
+## License
+
+This project is free software, licensed under the **GNU General Public License
+v3.0 or later** (`GPL-3.0-or-later`). See [LICENSE](LICENSE) for the full text.
+
+Copyright (C) 2026 Finnduas.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Please run
+`npm run typecheck && npm run smoke` before opening a pull request.

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** Render ABC -> SVG/PDF (abc2svg/abcm2ps CLI) and a self-contained abcjs HTML viewer. */
 
 import { execFile } from "node:child_process";

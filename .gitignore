@@ -10,6 +10,9 @@ compositions/*.svg
 compositions/*.html
 compositions/*.mid
 compositions/*.db
+compositions/*.json
+compositions/*.jsonl
+compositions/abcjs-basic-min.js
 !compositions/.gitkeep
 
 # os / editor

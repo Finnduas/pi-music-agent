@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /**
  * Offline smoke test for the full agent loop (no network / no API key).
  * Run: npx tsx scripts/smoke-loop.ts

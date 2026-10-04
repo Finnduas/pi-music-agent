@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** Extract ABC notation or JSON from an LLM response. */
 
 /** Pull the most likely ABC music block out of an LLM reply. */

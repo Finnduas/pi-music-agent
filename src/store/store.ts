@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** Persist compositions to a folder (+ optional SQLite index, JSONL fallback). */
 
 import fs from "node:fs/promises";

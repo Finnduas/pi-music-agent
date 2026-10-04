@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 import type { AppConfig, RoleConfig } from "../config.js";
 import { OpenAICompatClient } from "./openai-client.js";
 

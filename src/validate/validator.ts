@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /** ABC validation: local abcjs parse (default) or the n8n webhook backend. */
 
 export interface ValidationResult {

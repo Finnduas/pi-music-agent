@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 Finnduas
 /**
  * Offline smoke test for the n8n validation backend.
  * Starts a mock webhook server and verifies the HTTP client contract.

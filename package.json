@@ -4,6 +4,27 @@
   "private": true,
   "type": "module",
   "description": "Classical music composition harness: compose -> validate -> critique -> iterate -> render -> store, in ABC notation.",
+  "license": "GPL-3.0-or-later",
+  "author": "Finnduas (https://github.com/Finnduas)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Finnduas/pi-music-agent.git"
+  },
+  "homepage": "https://github.com/Finnduas/pi-music-agent#readme",
+  "bugs": {
+    "url": "https://github.com/Finnduas/pi-music-agent/issues"
+  },
+  "keywords": [
+    "abc-notation",
+    "music",
+    "composition",
+    "llm",
+    "openrouter",
+    "ollama",
+    "n8n",
+    "sheet-music",
+    "abcjs"
+  ],
   "bin": {
     "music-agent": "dist/cli.js"
   },
