@@ -1,0 +1,32 @@
+{
+  "name": "pi-music-agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Classical music composition harness: compose -> validate -> critique -> iterate -> render -> store, in ABC notation.",
+  "bin": {
+    "music-agent": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "gen:n8n": "node scripts/gen-n8n-workflow.mjs",
+    "smoke": "tsx scripts/smoke-loop.ts && tsx scripts/smoke-n8n.ts"
+  },
+  "dependencies": {
+    "abcjs": "^6.4.4",
+    "commander": "^12.1.0",
+    "js-yaml": "^4.1.0"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.3.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.5.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.2"
+  }
+}

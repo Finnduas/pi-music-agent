@@ -1,0 +1,18 @@
+# dependencies / build output
+node_modules/
+dist/
+
+# local secrets & data
+config.yaml
+.env
+compositions/*.abc
+compositions/*.svg
+compositions/*.html
+compositions/*.mid
+compositions/*.db
+!compositions/.gitkeep
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.log

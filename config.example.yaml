@@ -1,0 +1,59 @@
+# ---------------------------------------------------------------------------
+# pi-music-agent configuration
+# Copy to `config.yaml` and edit. The file `config.yaml` is git-ignored.
+# ---------------------------------------------------------------------------
+
+# Where rendered pieces, ABC sources and the index DB are stored.
+storage:
+  dir: "./compositions"      # folder for .abc / .svg / .html outputs
+  # database: "./compositions/index.db"   # uncomment to use SQLite index
+
+# -------- LLM providers: one OpenAI-compatible client, switchable base_url --
+providers:
+  openrouter:
+    baseUrl: "https://openrouter.ai/api/v1"
+    # API key is read from OPENROUTER_API_KEY env var if `apiKey` is omitted.
+    apiKey: ""               # or put the key here (config.yaml is git-ignored)
+    headers:
+      HTTP-Referer: "https://localhost/pi-music-agent"
+      X-Title: "pi-music-agent"
+  ollama:
+    baseUrl: "http://localhost:11434/v1"
+    apiKey: "ollama"         # Ollama ignores it, but the client requires a value
+
+# -------- Role configuration: which provider/model plays which role ---------
+roles:
+  composer:
+    provider: openrouter
+    model: "anthropic/claude-3.5-sonnet"
+    temperature: 0.9
+    maxTokens: 4096
+  critic:
+    provider: openrouter
+    model: "anthropic/claude-3.5-sonnet"
+    temperature: 0.2
+    maxTokens: 2048
+
+  # --- Fully local example (install Ollama + `ollama pull qwen2.5:14b`) -----
+  # composer: { provider: ollama, model: "qwen2.5:14b", temperature: 0.9 }
+  # critic:   { provider: ollama, model: "qwen2.5:14b", temperature: 0.2 }
+
+# -------- Validation: local abcjs (default) or the n8n webhook --------------
+validation:
+  backend: local             # "local" | "n8n"
+  n8n:
+    webhookUrl: "http://localhost:5678/webhook/notation-validation"
+    timeoutMs: 15000
+
+# -------- Rendering ---------------------------------------------------------
+render:
+  prefer: ["abc2svg", "abcm2ps"]   # CLI tools tried in order (if installed)
+  formats: ["svg", "html"]         # abcjs HTML viewer is always available
+  abc2svgPath: "abc2svg"           # override with an absolute path if needed
+  abcm2psPath: "abcm2ps"
+
+# -------- Agent loop limits ------------------------------------------------
+loop:
+  maxValidationRetries: 5    # feed validation errors back to the composer
+  maxIterations: 3           # compose/critique/revise cycles
+  scoreThreshold: 8          # critic score (0-10) needed to stop early

@@ -1,0 +1,88 @@
+{
+  "name": "Notation Validation Service",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "notation-validation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "notation-validation"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// ABC validation for the \"Notation Validation Service\" n8n workflow.\n// Uses abcjs from the Code node sandbox when available; otherwise falls back to\n// structural checks. No LLM, no loop, no storage.\nconst items = $input.all();\nconst out = [];\n\nfunction structuralCheck(notation) {\n  const errors = [];\n  const warnings = [];\n  if (!notation || typeof notation !== 'string' || notation.trim() === '') {\n    errors.push('Empty notation.');\n    return { valid: false, errors, warnings };\n  }\n  if (!/^\\s*X\\s*:/m.test(notation)) errors.push('Missing required X: header.');\n  if (!/^\\s*K\\s*:/m.test(notation)) errors.push('Missing required K: header.');\n  if (!/^\\s*M\\s*:/m.test(notation) && !/\\[M:/.test(notation)) warnings.push('No M: meter header.');\n  if (!/^\\s*L\\s*:/m.test(notation) && !/\\[L:/.test(notation)) warnings.push('No L: default note length header.');\n  const opens = (notation.match(/\\[/g) || []).length;\n  const closes = (notation.match(/\\]/g) || []).length;\n  if (opens !== closes) errors.push('Unbalanced [ ] brackets (likely truncated).');\n  const pops = (notation.match(/\\(/g) || []).length;\n  const pcloses = (notation.match(/\\)/g) || []).length;\n  if (pops !== pcloses) errors.push('Unbalanced ( ) parentheses.');\n  return { valid: errors.length === 0, errors, warnings };\n}\n\nfor (const item of items) {\n  const body = item.json.body || item.json;\n  const notation = body.notation || '';\n  let result;\n  try {\n    const abcjs = require('abcjs');\n    const tunes = abcjs.renderAbc('*', notation, { add_classes: false });\n    const errors = [];\n    const warnings = [];\n    if (!Array.isArray(tunes) || tunes.length === 0) errors.push('No tunes found.');\n    for (const t of tunes || []) {\n      for (const w of t.warnings || []) warnings.push(String(w));\n      const hasStaff = (t.lines || []).some((l) => (l.staff || []).length > 0);\n      if (!hasStaff) errors.push('Tune produced no staff content.');\n    }\n    const struct = structuralCheck(notation);\n    result = {\n      valid: errors.length === 0 && struct.valid,\n      errors: [...errors, ...struct.errors],\n      warnings: [...warnings, ...struct.warnings],\n    };\n  } catch (e) {\n    result = structuralCheck(notation);\n    result.warnings.push('abcjs unavailable; used structural checks only: ' + (e.message || e));\n  }\n  out.push({ json: result });\n}\nreturn out;\n"
+      },
+      "id": "validate-1",
+      "name": "Validate ABC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        700,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Validate ABC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate ABC": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "pi-music-agent-validation",
+    "description": "Validation-only service. POST { notation, title?, style? } -> { valid, errors[], warnings[] }. No LLM, no loop, no storage."
+  },
+  "tags": [
+    {
+      "name": "pi-music-agent"
+    }
+  ]
+}
