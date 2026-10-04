@@ -1,0 +1,24 @@
+X:1
+T:Minuet Based on Examples
+C:After Baroque Models
+M:3/4
+L:1/8
+Q:3/4=88
+K:G
+%%score {RH LH}
+V:RH clef=treble
+V:LH clef=bass
+%
+V:RH
+|: "G"B,2 G3 A | "D"B2 A2 Bc | "G"d2 cB AB | "C"c4 "D7"B2 |
+w:G major, simple elegance, balanced phrases.
+"D7"A2 ^F2 AB | "G"c2 Bc d2 | "D7"A2 dc BA | "G"G6 :|
+|: "Em"e2 g3 f | "B7"^d2 e2 ^fg | "C"a2 gf ed | "G"g4 G2 |
+w:Minor color, poignant and refined.
+"C"e2 g2 c'2 | "G"b2 ag fe | "D7"d2 cB AB | "G"G6 :|
+%
+V:LH
+|: G,3 A, B,C | D,3 E, F,G, | B,3 A, G,F, | E,3 F, G,A, |
+F,3 E, D,C, | B,,3 C, D,E, | F,3 E, D,C, | B,,2 D,2 G,2 :|
+|: E,3 F, G,A, | B,,3 ^C, ^D,E, | A,3 G, F,E, | D,3 E, F,G, |
+C,3 D, E,F, | G,3 A, B,C | D,3 E, ^F,G, | G,2 B,2 d2 :|

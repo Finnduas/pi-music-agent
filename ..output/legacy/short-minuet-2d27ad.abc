@@ -1,0 +1,23 @@
+X:1
+T:Short Minuet
+C:Trad. arr.
+M:3/4
+L:1/4
+Q:1/4=80
+K:G
+%
+%%score (1 2)
+%
+V:1
+D | GAB | c2B | A2G | F2D | GAB | c2e | d2^c |
+d2 A | afd | B2g | ecA | G2e | ded | c2B | A2G |
+F2 A | GAB | c2B | A2G | F2D | GAB | d2g | fed |
+c2 A | Bcd | e2d | cBA | B2G | A2D | GAB | A2G |
+G3 |]
+%
+V:2 clef=bass
+B,, | G,2D, | E,2G, | C,2E, | D,2A,, | G,,2B,, | C,2G,, | D,2A,, |
+D,2F, | D,2F, | G,2B, | A,2C | E,2C | F,2G, | A,2G, | D,2F, |
+D,2F, | G,2D, | E,2G, | C,2E, | D,2A,, | G,,2B,, | G,2B, | D,2F, |
+A,,2C, | G,2B,, | C,2A,, | D,2F, | G,2D, | D,2C, | B,,2G,, | D,2D,, |
+G,,3 |]

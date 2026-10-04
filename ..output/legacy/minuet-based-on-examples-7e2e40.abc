@@ -1,0 +1,22 @@
+X:1
+T:Minuet Based on Examples
+C:Composer
+M:3/4
+L:1/8
+Q:1/4=100
+K:G
+%%score {1 2}
+V:1 clef=treble
+V:2 clef=bass
+%
+V:1
+|: "G" d2 Bd gd | "D" c2 Ac fc | "G" B2 GB dB | "D" A2 ^GA cA |
+"G" d2 Bd gd | "Am" e2 ce ae | "D" d2 ^cd fd | "G" g4 z2 :|
+|: "Em" g2 eg bg | "B7" ^f2 df af | "Em" g2 eg bg | "Am" a4 z2 |
+"D" a2 fa da | "G" b2 gb db | "C" e2 ce "D" a2 | "G" g4 z2 :|
+%
+V:2
+|: G,4 B,2 | D,4 F,2 | G,4 B,2 | D,4 F,2 |
+G,4 B,2 | A,4 C2 | D,4 F,2 | G,4 z2 :|
+|: E,4 G,2 | B,,4 D,2 | E,4 G,2 | A,,4 C,2 |
+D,4 F,2 | G,4 B,2 | C,4 D,2 | G,4 z2 :|

@@ -1,0 +1,16 @@
+X:1
+T:A short cheerful minuet in G major
+C:Anonymous
+M:3/4
+L:1/8
+Q:1/4=120
+K:G
+%
+%%score (1 2)
+V:1
+|: "G" d2 Bd cB | "D" A2 FG A2 | "G" d2 Bd cB | "D" A2 FG A2 :|
+|: "G" B2 GB AG | "C" E2 CE G2 | "D" F2 DF AF |1 "G" G2 Bd g2 :|2 "G" G6 |]
+%
+V:2 clef=bass
+|: "G" G,2 B,D G,2 | "D" D,2 F,A, D,2 | "G" G,2 B,D G,2 | "D" D,2 F,A, D,2 :|
+|: "G" G,2 B,D G,2 | "C" C,2 EG C2 | "D" D,2 F,A, D,2 |1 "G" G,2 B,D G,2 :|2 "G" G,6 |]

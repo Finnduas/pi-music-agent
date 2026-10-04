@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>a-short-cheerful-8-bar-minuet-in-g-major-4a2d1d</title>
+<script src="./abcjs-basic-min.js" onerror="if(this.src!=='https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js'){this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js'}"></script>
+<style>
+  :root { color-scheme: light dark; }
+  *, *::before, *::after { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem; }
+  /* The score is always black ink on white paper, whatever the page theme
+     (abcjs draws notes in currentColor, so the colour must be set here). */
+  #paper { background: #fff; color: #000; overflow-x: auto; }
+  pre { background: #f5f5f5; padding: 1rem; overflow: auto; border-radius: 6px; font-size: .8rem; white-space: pre-wrap; }
+  .controls { margin: 1rem 0; display: flex; gap: .5rem; flex-wrap: wrap; }
+  button { padding: .45rem .9rem; border: 1px solid #c9c9c9; background: #fff; color: #1a1a1a; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+  button:disabled { opacity: .6; cursor: progress; }
+  button:hover { background: #f0f0f0; }
+  #fallback { color: #a00; }
+  #status { font-size: .85rem; color: #666; min-height: 1.2em; }
+  @media print {
+    body { margin: 0; max-width: none; padding: 0; }
+    h1 { margin: 0 0 1rem; }
+    .controls, #abc, #fallback, #status { display: none !important; }
+    #paper { background: #fff; }
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e6e6e6; background: #111; }
+    #paper { background: #fff; color: #000; padding: 1rem; border-radius: 6px; }
+    pre { background: #1f1f1f; color: #e6e6e6; }
+    button { background: #2a2a2a; color: #e6e6e6; border-color: #4a4a4a; }
+    button:hover { background: #363636; }
+    #status { color: #aaa; }
+  }
+</style>
+</head>
+<body>
+<h1>a-short-cheerful-8-bar-minuet-in-g-major-4a2d1d</h1>
+<div id="fallback" hidden></div>
+<div id="paper"></div>
+<div class="controls">
+  <button type="button" id="btn-play">&#9654; Play</button>
+  <button type="button" id="btn-midi">Download MIDI</button>
+  <button type="button" id="btn-abc">Show ABC</button>
+  <button type="button" id="btn-download">Download .abc</button>
+  <button type="button" id="btn-print">Print / Save PDF</button>
+</div>
+<div id="status" aria-live="polite"></div>
+<pre id="abc" hidden></pre>
+<script>
+(function () {
+  var abc = "X:1\nT:Cheerful Minuet in G\nC:AI Composer\nM:3/4\nL:1/8\nQ:1/4=112\nK:G\n|: d2 G2 B2 | d4 g2 | f2 e2 d2 | c4 B2 |\nA2 B2 c2 | d2 e2 f2 | e2 d2 c2 | B2 G4 :|";
+  var downloadName = "a-short-cheerful-8-bar-minuet-in-g-major-4a2d1d.abc";
+  var paper = document.getElementById('paper');
+  var abcEl = document.getElementById('abc');
+  var fallback = document.getElementById('fallback');
+  abcEl.textContent = abc;
+
+  function toggleAbc() {
+    var hidden = !abcEl.hidden;
+    abcEl.hidden = hidden;
+    document.getElementById('btn-abc').textContent = hidden ? 'Show ABC' : 'Hide ABC';
+  }
+
+  function downloadAbc() {
+    var blob = new Blob([abc], { type: 'text/vnd.abc' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = downloadName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  function printPage() { window.print(); }
+
+  /* ---- audio: abcjs synth (piano samples load from the internet on first play) ---- */
+  var tune = null;
+  var synth = null;
+  var playing = false;
+  var btnPlay = document.getElementById('btn-play');
+  var statusEl = document.getElementById('status');
+  function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+  function stopPlayback() {
+    if (synth) { try { synth.stop(); } catch (e) {} }
+    playing = false;
+    btnPlay.innerHTML = '&#9654; Play';
+  }
+
+  function togglePlay() {
+    if (playing) { stopPlayback(); setStatus(''); return; }
+    if (!tune || !ABCJS.synth || !ABCJS.synth.supportsAudio()) {
+      setStatus('Audio playback is not supported in this browser. Use Download MIDI instead.');
+      return;
+    }
+    btnPlay.disabled = true;
+    setStatus('Loading piano sounds...');
+    synth = new ABCJS.synth.CreateSynth();
+    synth.init({ visualObj: tune, options: { onEnded: function () { stopPlayback(); setStatus(''); } } })
+      .then(function () { return synth.prime(); })
+      .then(function () {
+        synth.start();
+        playing = true;
+        btnPlay.innerHTML = '&#9632; Stop';
+        setStatus('Playing...');
+      })
+      .catch(function (e) {
+        stopPlayback();
+        setStatus('Could not play audio (the piano sounds need an internet connection on first play). ' +
+          'Use Download MIDI instead. ' + (e && e.message ? e.message : ''));
+      })
+      .then(function () { btnPlay.disabled = false; });
+  }
+
+  function downloadMidi() {
+    try {
+      var bytes = ABCJS.synth.getMidiFile(abc, { midiOutputType: 'binary' })[0];
+      var url = URL.createObjectURL(new Blob([bytes], { type: 'audio/midi' }));
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName.replace(/\.abc$/, '') + '.mid';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    } catch (e) {
+      setStatus('Could not create MIDI: ' + (e && e.message ? e.message : e));
+    }
+  }
+
+  document.getElementById('btn-abc').addEventListener('click', toggleAbc);
+  document.getElementById('btn-download').addEventListener('click', downloadAbc);
+  document.getElementById('btn-print').addEventListener('click', printPage);
+  btnPlay.addEventListener('click', togglePlay);
+  document.getElementById('btn-midi').addEventListener('click', downloadMidi);
+
+  if (typeof ABCJS !== 'undefined' && ABCJS.renderAbc) {
+    tune = ABCJS.renderAbc(paper, abc, { responsive: 'resize', add_classes: true })[0] || null;
+  } else {
+    fallback.hidden = false;
+    fallback.innerHTML = 'Could not load the ABCJS renderer &#8212; please check your network connection and reload.';
+  }
+})();
+</script>
+</body>
+</html>

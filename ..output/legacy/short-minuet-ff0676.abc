@@ -1,0 +1,37 @@
+X:1
+T:Short Minuet
+C:Anonymous
+M:3/4
+L:1/8
+Q:3/4=80
+K:G
+%%score (1 2)
+V:1 clef=treble
+V:2 clef=bass
+%
+% === A Section ===
+V:1
+|: (3DEF | G4 A2 | B4 c2 | d2 B2 G2 | A4 (3DEF |
+w: * * * * * * * *
+V:2
+|: [G,3D3] z2 D, | G,4 F,2 | G,4 A,2 | B,4 B,,2 | C,4 D,2 |
+w: * * * * * * * *
+%
+V:1
+G4 A2 | B4 c2 | d2 c2 B2 | A6 | G4 :|
+w: * * * * * * *
+V:2
+G,4 F,2 | E,4 D,2 | C,4 D,2 | D,6 | G,4 :|
+%
+% === B Section ===
+V:1
+|: d2 | g2 d2 B2 | c4 A2 | d2 c2 B2 | A4 d2 |
+w: * * * * * * *
+V:2
+|: B,2 | G,4 G,,2 | A,4 C,2 | B,4 G,2 | D,4 F,2 |
+%
+V:1
+g2 f2 e2 | d2 c2 B2 | c2 A2 F#2 | G6 | G4 :|
+w: * * * * * * *
+V:2
+E,4 C,2 | B,,4 G,,2 | A,,4 D,2 | G,6 | G,4 :|

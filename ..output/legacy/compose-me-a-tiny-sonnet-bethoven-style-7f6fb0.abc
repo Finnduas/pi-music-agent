@@ -1,0 +1,24 @@
+X:1
+T:Tiny Sonnet
+C:After Beethoven
+M:2/4
+L:1/8
+Q:1/4=100
+K:Cm
+
+V:1 name="right hand"
+V:2 name="left hand" clef=bass
+
+%%score (1 2)
+
+V:1
+!p! G2 E/F/G/ | A>G (3=B/c/d/ | (3e/d/c/ d>e | (3f/e/d/ (3e/d/c/ |
+(3_d/c/_B/ (3c/_B/A/ | (3G/A/_B/ (3A/_B/c/ | (3^F/G/A/ (3A/=B/c/ | d2 z2 |
+(3^F/G/A/ (3A/=B/c/ | d>c (3=B/c/d/ | (3e/d/c/ (3_d/c/_B/ | (3c/_B/A/ (3G/F/E/ |
+(3G/A/_B/ (3A/G/^F/ | G/A/_B/ c/d/e/ | (3d/c/_B/ (3c/_B/G/ | A2 z2 |]
+
+V:2
+[CG,]2 [C,G,,]2 | [_B,,F,]2 [B,,,F,,]2 | [A,,E,]2 [A,,,E,,]2 | [_A,,E,]2 [_A,,,E,,]2 |
+[G,,D,]2 [G,,,D,,]2 | [F,,C,]2 [F,,,C,,]2 | [E,,B,,G,]2 [E,,,B,,,G,,]2 | [F,,C,]4 |
+[D,,A,,F,]2 [D,,,A,,,F,,]2 | [G,,D,]2 [G,,,D,,]2 | [C,G,]2 [C,,G,,]2 | [F,,C,]2 [F,,,C,,]2 |
+[E,,B,,G,]2 [E,,,B,,,G,,]2 | [A,,E,]2 [A,,,E,,]2 | [G,,D,]2 [G,,,D,,]2 | [C,G,]2 [G,,D,]2 |]
