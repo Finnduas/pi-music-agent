@@ -86,6 +86,36 @@ Contract: `POST { notation, title?, style? }` →
   way to get a PDF on any platform.
 - Optional publication quality: LilyPond (`abc2ly`) or MuseScore CLI.
 
+## Viewing and playing ABC files
+
+**Easiest: the generated `.html` viewer** (next to every `.abc` in `output/`).
+Double-click it to open it in any browser. It needs no install.
+
+| Button | Does | Offline? |
+|---|---|---|
+| **▶ Play / ■ Stop** | plays the score with a piano sound (abcjs synth) | no, piano samples load from the internet on first play |
+| **Download MIDI** | saves a `.mid` file (open in Windows Media Player, VLC, GarageBand, MuseScore…) | yes |
+| **Print / Save PDF** | clean printable score (choose "Save as PDF") | yes |
+| **Download .abc** / **Show ABC** | the plain-text source | yes |
+
+Check it on your machine: `npm run check:browser` (headless Chrome/Edge: renders,
+plays, stops, MIDI). Add `--full` to also wait until the piece finishes.
+
+Render a viewer for any ABC file (e.g. one you wrote yourself):
+
+```bash
+node dist/cli.js render my_piece.abc --formats html     # -> output/my_piece.html
+```
+
+**Other programs** (if you want to *edit* ABC with live preview + playback):
+
+- **EasyABC**: free desktop ABC editor for Windows/macOS/Linux. It shows, plays, and
+  exports MIDI/PDF/MusicXML.
+- **abcjs editor / abcnotation.com**: paste ABC into a web page for preview + playback.
+- **MuseScore**: full notation editor. Import the MIDI (or MusicXML exported from
+  EasyABC) to edit the score graphically.
+- **abc2midi** (command line, from abcMIDI): `abc2midi piece.abc -o piece.mid`.
+
 See [scripts/install-tools.md](scripts/install-tools.md) for install commands.
 
 ## Usage

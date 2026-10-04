@@ -26,8 +26,9 @@ CLI; it never touches this repo's source.
 | "Rewrite this in F major" | `sheetmusic_analyze` → compute semitones → `sheetmusic_transpose` (deterministic, no LLM) |
 | "Turn input/score.pdf into notation" | `sheetmusic_convert` (OMR via n8n or local Audiveris) |
 
-Results land in `output/` as `.abc` + an offline `.html` sheet-music viewer (with
-**Print / Save PDF** and **Download .abc**).
+Results land in `output/` as `.abc` + an `.html` sheet-music viewer. Open it in any
+browser: **Play** (audio), **Download MIDI**, **Print / Save PDF**, **Download .abc**.
+See [Viewing and playing ABC files](docs/USAGE.md#viewing-and-playing-abc-files).
 
 ## Quick start
 

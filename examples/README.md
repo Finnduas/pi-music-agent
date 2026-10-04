@@ -33,9 +33,9 @@ Or in Pi: *"Fill in the gap in examples/input/minuet-with-gap.abc"*.
 | File | What it is |
 |---|---|
 | `minuet-in-g-major.abc` | The ABC source of a composed minuet |
-| `minuet-in-g-major.html` | Offline, interactive sheet-music viewer (open in a browser; use its Print/Save PDF button) |
+| `minuet-in-g-major.html` | Sheet-music viewer: open in a browser to **Play**, **Download MIDI**, or **Print / Save PDF** |
 | `minuet-with-gap-filled.abc/.html` | Result of the fill-the-gap demo (bars 5-6 written by the agent through Pi) |
-| `ode-to-joy-in-F.abc` | "Rewrite in F major" demo: Ode to Joy transposed +5 (Bb written as a plain `B` via the F-major key signature) |
+| `ode-to-joy-in-F.abc/.html` | "Rewrite in F major" demo: Ode to Joy transposed +5 (Bb written as a plain `B` via the F-major key signature) |
 | `abcjs-basic-min.js` | Vendored renderer so `minuet-in-g-major.html` works offline |
 
 This minuet was produced end-to-end by the agent loop: compose → validate →

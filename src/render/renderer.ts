@@ -135,10 +135,11 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
   button { padding: .45rem .9rem; border: 1px solid #c9c9c9; background: #fff; border-radius: 6px; cursor: pointer; font-size: .9rem; }
   button:hover { background: #f0f0f0; }
   #fallback { color: #a00; }
+  #status { font-size: .85rem; color: #666; min-height: 1.2em; }
   @media print {
     body { margin: 0; max-width: none; padding: 0; }
     h1 { margin: 0 0 1rem; }
-    .controls, #abc, #fallback { display: none !important; }
+    .controls, #abc, #fallback, #status { display: none !important; }
     #paper { background: #fff; }
   }
   @media (prefers-color-scheme: dark) {
@@ -153,10 +154,13 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
 <div id="fallback" hidden></div>
 <div id="paper"></div>
 <div class="controls">
+  <button type="button" id="btn-play">&#9654; Play</button>
+  <button type="button" id="btn-midi">Download MIDI</button>
   <button type="button" id="btn-abc">Show ABC</button>
   <button type="button" id="btn-download">Download .abc</button>
   <button type="button" id="btn-print">Print / Save PDF</button>
 </div>
+<div id="status" aria-live="polite"></div>
 <pre id="abc" hidden></pre>
 <script>
 (function () {
@@ -187,12 +191,69 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
 
   function printPage() { window.print(); }
 
+  /* ---- audio: abcjs synth (piano samples load from the internet on first play) ---- */
+  var tune = null;
+  var synth = null;
+  var playing = false;
+  var btnPlay = document.getElementById('btn-play');
+  var statusEl = document.getElementById('status');
+  function setStatus(msg) { statusEl.textContent = msg || ''; }
+
+  function stopPlayback() {
+    if (synth) { try { synth.stop(); } catch (e) {} }
+    playing = false;
+    btnPlay.innerHTML = '&#9654; Play';
+  }
+
+  function togglePlay() {
+    if (playing) { stopPlayback(); setStatus(''); return; }
+    if (!tune || !ABCJS.synth || !ABCJS.synth.supportsAudio()) {
+      setStatus('Audio playback is not supported in this browser. Use Download MIDI instead.');
+      return;
+    }
+    btnPlay.disabled = true;
+    setStatus('Loading piano sounds...');
+    synth = new ABCJS.synth.CreateSynth();
+    synth.init({ visualObj: tune, options: { onEnded: function () { stopPlayback(); setStatus(''); } } })
+      .then(function () { return synth.prime(); })
+      .then(function () {
+        synth.start();
+        playing = true;
+        btnPlay.innerHTML = '&#9632; Stop';
+        setStatus('Playing...');
+      })
+      .catch(function (e) {
+        stopPlayback();
+        setStatus('Could not play audio (the piano sounds need an internet connection on first play). ' +
+          'Use Download MIDI instead. ' + (e && e.message ? e.message : ''));
+      })
+      .then(function () { btnPlay.disabled = false; });
+  }
+
+  function downloadMidi() {
+    try {
+      var bytes = ABCJS.synth.getMidiFile(abc, { midiOutputType: 'binary' })[0];
+      var url = URL.createObjectURL(new Blob([bytes], { type: 'audio/midi' }));
+      var a = document.createElement('a');
+      a.href = url;
+      a.download = downloadName.replace(/\\.abc$/, '') + '.mid';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+    } catch (e) {
+      setStatus('Could not create MIDI: ' + (e && e.message ? e.message : e));
+    }
+  }
+
   document.getElementById('btn-abc').addEventListener('click', toggleAbc);
   document.getElementById('btn-download').addEventListener('click', downloadAbc);
   document.getElementById('btn-print').addEventListener('click', printPage);
+  btnPlay.addEventListener('click', togglePlay);
+  document.getElementById('btn-midi').addEventListener('click', downloadMidi);
 
   if (typeof ABCJS !== 'undefined' && ABCJS.renderAbc) {
-    ABCJS.renderAbc(paper, abc, { responsive: 'resize', add_classes: true });
+    tune = ABCJS.renderAbc(paper, abc, { responsive: 'resize', add_classes: true })[0] || null;
   } else {
     fallback.hidden = false;
     fallback.innerHTML = 'Could not load the ABCJS renderer &#8212; please check your network connection and reload.';
@@ -256,7 +317,9 @@ export async function renderAbc(opts: RenderOptions): Promise<RenderResult> {
         'The CLI renderer does not emit PDF; open the HTML viewer and use "Print / Save PDF".',
       );
     } else if (fmt === "midi") {
-      warnings.push('MIDI/audio synthesis is out of scope; ignoring "midi" format.');
+      warnings.push(
+        'The CLI does not write MIDI files; open the HTML viewer and use "Play" or "Download MIDI".',
+      );
     } else {
       warnings.push(`Unknown render format "${fmt}" ignored (supported: svg, html).`);
     }

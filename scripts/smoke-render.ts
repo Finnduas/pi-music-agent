@@ -61,13 +61,17 @@ async function main() {
     ["viewer has Download .abc control", page.includes("Download .abc")],
     ["viewer no longer instantiates ABCJS.Editor", !page.includes("ABCJS.Editor")],
     ["viewer no longer has dead Stop audio stub", !page.includes("Stop audio")],
+    ["viewer has Play control", page.includes('id="btn-play"')],
+    ["viewer plays via the abcjs synth", page.includes("ABCJS.synth.CreateSynth")],
+    ["viewer has Download MIDI control", page.includes("Download MIDI")],
+    ["viewer keeps the rendered tune for playback", page.includes("tune = ABCJS.renderAbc(")],
     [
       "pdf format warns (use viewer print)",
       warn.warnings.some((w) => w.includes("Print / Save PDF")),
     ],
     [
-      "midi format warns (out of scope)",
-      warn.warnings.some((w) => w.includes("out of scope")),
+      "midi format warns (points to viewer Play / Download MIDI)",
+      warn.warnings.some((w) => w.includes("Download MIDI")),
     ],
     ["unknown format warns", warn.warnings.some((w) => w.includes("bogus"))],
   ];

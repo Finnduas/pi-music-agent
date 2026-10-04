@@ -64,14 +64,15 @@ and a browser ready.
 |---|---|---|
 | 0 | `/music` | Extension loaded; list of commands |
 | 1 | *"Fill in the gap in examples/input/minuet-with-gap.abc"* | Pi reads the file, calls `sheetmusic_analyze` (gaps: bars 5–6), then `sheetmusic_edit` |
-| 2 | (open the new `output/*.html`) | Rendered sheet music; click **Print / Save PDF** |
+| 2 | (open the new `output/*.html`) | Rendered sheet music; click **▶ Play** to hear it, **Print / Save PDF** to print |
 | 3 | *"Rewrite examples/input/ode-to-joy.abc in F major"* | `analyze` → compute 5 semitones → `sheetmusic_transpose` (instant, no LLM) |
 | 4 | *"Write me a short minuet in the style of the pieces in examples/input"* | `sheetmusic_compose` with references; ~1–2 min |
 | 5 | *"What key is output/….abc in?"* | `sheetmusic_analyze` only — free |
 
 *Tips:* the compose/edit calls take 30–90 s (two LLM calls per round) — talk
 through the loop while waiting. Run step 1 once before the talk as a backup and
-keep its HTML open in a tab.
+keep its HTML open in a tab. Run `npm run check:browser` beforehand; Play needs
+internet for the piano samples (Download MIDI works offline).
 
 **If the network or API fails:** run `npm run smoke` — the whole loop runs
 offline with fake LLMs and prints PASS lines; show `examples/output/` instead.
@@ -93,7 +94,7 @@ offline with fake LLMs and prints PASS lines; show `examples/output/` instead.
 
 ## 9. Next steps (30 s)
 
-OMR end-to-end with real scans · MIDI/audio playback · multi-voice-aware gap
+OMR end-to-end with real scans · offline sound samples · multi-voice-aware gap
 filling · richer critic (voice-leading rules).
 
 ---
