@@ -12,6 +12,9 @@ structured judgement. Judge on:
 
 # Output format
 
+Be concise: at most 3 strengths, 3 issues and 3 suggestions, each a single short
+clause. One-sentence summary.
+
 Return ONLY a single JSON object (no prose, no code fence required, but a fence is
 acceptable). Exactly this shape:
 

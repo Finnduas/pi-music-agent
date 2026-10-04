@@ -107,10 +107,13 @@ Contract: `POST { notation, title?, style? }` →
 
 ## Rendering
 
-- `abc2svg` / `abcm2ps` CLI → SVG (and PDF with the right flags). Auto-detected
-  on `PATH`; override paths in `render.abc2svgPath` / `render.abcm2psPath`.
+- `abc2svg` / `abcm2ps` CLI → SVG. Auto-detected on `PATH`; override paths in
+  `render.abc2svgPath` / `render.abcm2psPath`.
 - The **abcjs** interactive HTML viewer is always produced and works offline (the
-  abcjs bundle is vendored next to the HTML, with a CDN fallback).
+  abcjs bundle is vendored next to the HTML, with a CDN fallback). Its controls
+  let you show/hide the ABC source, download the `.abc`, and **Print / Save PDF**
+  — `<Ctrl/Cmd>-P` or the button prints a clean score, which is also the reliable
+  way to get a PDF on any platform.
 - Optional publication quality: LilyPond (`abc2ly`) or MuseScore CLI.
 
 See [scripts/install-tools.md](scripts/install-tools.md) for install commands.
@@ -136,9 +139,28 @@ cat my_piece.abc | npx tsx src/cli.ts validate -
 
 # Render an existing ABC file
 npx tsx src/cli.ts render my_piece.abc -o out/
+npx tsx src/cli.ts render my_piece.abc -o out/ --formats svg,html
 
-# List stored pieces / inspect resolved config
+# Compose in the style of pieces dropped in input/
+npx tsx src/cli.ts compose "a minuet in the style of the input pieces" --refs input
+
+# Rewrite a piece in another key (transpose by semitones)
+npx tsx src/cli.ts transpose 2 my_piece.abc    # +2 semitones (D -> E)
+
+# Deterministic quick facts (bars / meter / key / tonic / voices)
+npx tsx src/cli.ts analyze my_piece.abc
+
+# Convert sheet music (PDF/image/MusicXML) -> ABC (needs an OMR backend)
+npx tsx src/cli.ts convert input/score.pdf
+
+# Interactive multi-turn editor (load, edit, critique, transpose, save)
+npx tsx src/cli.ts session -f my_piece.abc
+npx tsx src/cli.ts session <id>       # resume a stored piece by id
+
+# List stored pieces / inspect one / inspect resolved config
 npx tsx src/cli.ts list
+npx tsx src/cli.ts show <id>            # full record + critic report + ABC
+npx tsx src/cli.ts show <id> --abc      # just the ABC notation
 npx tsx src/cli.ts config
 ```
 
@@ -158,15 +180,31 @@ npm run smoke       # full agent loop with fake LLMs + n8n backend mock
 ## Storage layout
 
 ```
-compositions/
+input/                            # drop sheet music (PDF/image/MusicXML/ABC) here
+output/                           # rendered pieces land here
   <timestamp>-<title>-<id>.abc    # the score
-  <timestamp>-<title>-<id>.html   # offline abcjs viewer
+  <timestamp>-<title>-<id>.html   # offline abcjs viewer (open to print/save PDF)
   <timestamp>-<title>-<id>.svg    # if an SVG engine is installed
   abcjs-basic-min.js              # vendored viewer dependency
   <id>.json                       # full record (ABC + critic report + meta)
   index.jsonl                     # append-only index
   index.db                        # optional SQLite index (set storage.database)
 ```
+
+## Using Pi as the base (music tasks, not code edits)
+
+The `pi-integration/` folder bundles a Pi **extension** + **skill** so Pi can
+drive the music agent as a tool. Install with the commands in
+[pi-integration/README.md](pi-integration/README.md), then in Pi just say:
+
+- `"write me a minuet based on the work in the input folder"`
+- `"rewrite this in F major"`
+- `"turn input/score.pdf into notation"`
+
+Pi maps these to `/compose … --refs input`, `/music-transpose …`, and
+`/music-convert …` (or the `sheetmusic_compose` / `sheetmusic_transpose` /
+`sheetmusic_convert` tools). For music tasks Pi drives the fixed CLI; it does
+not edit the music agent's own source code.
 
 ## Project layout
 
@@ -181,21 +219,38 @@ src/
   validate/
     validator.ts         # local abcjs  |  n8n webhook
     n8n-workflow.json    # importable validation workflow
+  convert/
+    convert.ts           # sheet music (PDF/image/MusicXML) -> ABC
+    n8n-omr-workflow.json
+  music/abc.ts           # deterministic analysis + transposition
   render/renderer.ts     # abc2svg/abcm2ps + offline abcjs HTML
   store/store.ts         # folder + JSONL (+ optional SQLite)
-  loop/orchestrator.ts   # the agent loop
+  loop/
+    orchestrator.ts      # the agent loop
+    tools.ts             # composer tools (analyze_score, transpose)
+    session.ts           # interactive session
   cli.ts                 # command line interface
 prompts/                 # composer.md, critic.md
-scripts/                 # install docs, n8n generator, smoke tests
+scripts/                 # install docs, n8n generators, smoke tests
+pi-integration/          # Pi extension + skill
 ```
 
 ## Scope
 
 In scope: ABC generation, validation, critique/iteration, engraving (SVG/PDF/HTML),
-and local storage. **Out of scope (by design):** MIDI and audio synthesis.
+local storage, deterministic score analysis/transposition, interactive editing,
+and sheet music → ABC conversion (via the OMR n8n workflow or local
+Audiveris + music21). **Out of scope (by design):** MIDI and audio synthesis.
 
-The stretch goal — sheet music → ABC via Audiveris + music21 in a second n8n
-workflow — is covered in [scripts/install-tools.md](scripts/install-tools.md).
+Sheet-music → ABC conversion uses `src/convert/n8n-omr-workflow.json` (import it
+into n8n; regenerate with `npm run gen:n8n:omr`). See
+[scripts/install-tools.md](scripts/install-tools.md) for the local tool setup.
+
+## Docs & examples
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — services used, n8n integration, structure.
+- [examples/](examples/) — ready-made public-domain demo files (input references + a generated score).
+- [pi-integration/README.md](pi-integration/README.md) — how to drive this as a music tool from Pi.
 
 ## License
 

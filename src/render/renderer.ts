@@ -108,15 +108,16 @@ async function renderWithAbcm2ps(
 /* ----------------------------- abcjs viewer ------------------------------ */
 
 function htmlViewer(title: string, abc: string, scriptSrc: string): string {
-  const safeTitle = title.replace(/[<>&"]/g, (c) =>
-    ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" })[c]!,
+  const safeTitle = title.replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!,
   );
   const abcJson = JSON.stringify(abc);
+  const downloadName = JSON.stringify(`${title}.abc`);
   const fallback = "https://cdn.jsdelivr.net/npm/abcjs@6/dist/abcjs-basic-min.js";
   const onerror =
     scriptSrc === fallback
       ? ""
-      : ` onerror="this.onerror=null;this.src='${fallback}'"`;
+      : ` onerror="if(this.src!=='${fallback}'){this.onerror=null;this.src='${fallback}'}"`;
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -125,32 +126,78 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
 <title>${safeTitle}</title>
 <script src="${scriptSrc}"${onerror}></script>
 <style>
-  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; color: #222; }
-  h1 { font-size: 1.25rem; font-weight: 600; }
-  #paper { background: #fff; }
-  pre { background: #f5f5f5; padding: 1rem; overflow:auto; border-radius: 6px; font-size: .8rem; }
-  .controls { margin: 1rem 0; display:flex; gap:.5rem; flex-wrap:wrap; }
-  button { padding:.4rem .8rem; border:1px solid #ccc; background:#fff; border-radius:6px; cursor:pointer; }
-  button:hover { background:#f0f0f0; }
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; color: #1a1a1a; }
+  h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem; }
+  #paper { background: #fff; overflow-x: auto; }
+  pre { background: #f5f5f5; padding: 1rem; overflow: auto; border-radius: 6px; font-size: .8rem; white-space: pre-wrap; }
+  .controls { margin: 1rem 0; display: flex; gap: .5rem; flex-wrap: wrap; }
+  button { padding: .45rem .9rem; border: 1px solid #c9c9c9; background: #fff; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+  button:hover { background: #f0f0f0; }
+  #fallback { color: #a00; }
+  @media print {
+    body { margin: 0; max-width: none; padding: 0; }
+    h1 { margin: 0 0 1rem; }
+    .controls, #abc, #fallback { display: none !important; }
+    #paper { background: #fff; }
+  }
+  @media (prefers-color-scheme: dark) {
+    body { color: #e6e6e6; background: #111; }
+    #paper { background: #fff; padding: 1rem; border-radius: 6px; }
+    pre { background: #1f1f1f; color: #e6e6e6; }
+  }
 </style>
 </head>
 <body>
 <h1>${safeTitle}</h1>
+<div id="fallback" hidden></div>
 <div id="paper"></div>
 <div class="controls">
-  <button onclick="toggleAbc()">Show/hide ABC</button>
-  <button onclick="stopAudio && stopAudio()">Stop audio</button>
+  <button type="button" id="btn-abc">Show ABC</button>
+  <button type="button" id="btn-download">Download .abc</button>
+  <button type="button" id="btn-print">Print / Save PDF</button>
 </div>
 <pre id="abc" hidden></pre>
 <script>
+(function () {
   var abc = ${abcJson};
-  document.getElementById('abc').textContent = abc;
-  var renderer = new ABCJS.Editor('paper', { canvas_id: 'paper' }, {});
-  ABCJS.renderAbc('paper', abc, { responsive: 'resize' });
-  var synth = new ABCJS.synth.CreateSynth();
-  function toggleAbc(){ var e=document.getElementById('abc'); e.hidden=!e.hidden; }
-  var stopAudio = null;
-  // Optional: play button could be added here via ABCJS.synth.
+  var downloadName = ${downloadName};
+  var paper = document.getElementById('paper');
+  var abcEl = document.getElementById('abc');
+  var fallback = document.getElementById('fallback');
+  abcEl.textContent = abc;
+
+  function toggleAbc() {
+    var hidden = !abcEl.hidden;
+    abcEl.hidden = hidden;
+    document.getElementById('btn-abc').textContent = hidden ? 'Show ABC' : 'Hide ABC';
+  }
+
+  function downloadAbc() {
+    var blob = new Blob([abc], { type: 'text/vnd.abc' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = downloadName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 0);
+  }
+
+  function printPage() { window.print(); }
+
+  document.getElementById('btn-abc').addEventListener('click', toggleAbc);
+  document.getElementById('btn-download').addEventListener('click', downloadAbc);
+  document.getElementById('btn-print').addEventListener('click', printPage);
+
+  if (typeof ABCJS !== 'undefined' && ABCJS.renderAbc) {
+    ABCJS.renderAbc(paper, abc, { responsive: 'resize', add_classes: true });
+  } else {
+    fallback.hidden = false;
+    fallback.innerHTML = 'Could not load the ABCJS renderer &#8212; please check your network connection and reload.';
+  }
+})();
 </script>
 </body>
 </html>`;
@@ -199,6 +246,20 @@ export async function renderAbc(opts: RenderOptions): Promise<RenderResult> {
     );
     files.push(htmlPath);
     if (engine === "none") engine = "abcjs";
+  }
+
+  // Surface unsupported formats instead of silently ignoring them.
+  for (const fmt of opts.formats) {
+    if (fmt === "svg" || fmt === "html") continue;
+    if (fmt === "pdf") {
+      warnings.push(
+        'The CLI renderer does not emit PDF; open the HTML viewer and use "Print / Save PDF".',
+      );
+    } else if (fmt === "midi") {
+      warnings.push('MIDI/audio synthesis is out of scope; ignoring "midi" format.');
+    } else {
+      warnings.push(`Unknown render format "${fmt}" ignored (supported: svg, html).`);
+    }
   }
 
   return { files, engine, warnings };

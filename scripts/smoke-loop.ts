@@ -37,6 +37,7 @@ async function main() {
 
   let composerCalls = 0;
   let criticCalls = 0;
+  let lastCriticUser = "";
 
   const composerFn = {
     async complete(_system: string, user: string) {
@@ -55,8 +56,9 @@ async function main() {
   };
 
   const criticFn = {
-    async complete(_system: string, _user: string) {
+    async complete(_system: string, user: string) {
       criticCalls++;
+      lastCriticUser = user;
       if (criticCalls === 1) {
         return JSON.stringify({
           score: 5,
@@ -97,6 +99,7 @@ async function main() {
     ["at least one file rendered", result.files.length >= 1],
     ["index.jsonl written", await exists(path.join(dir, "index.jsonl"))],
     ["record json written", await exists(path.join(dir, `${result.id}.json`))],
+    ["critic receives deterministic score facts", lastCriticUser.includes("Score facts")],
   ];
 
   console.log("\n--- checks ---");

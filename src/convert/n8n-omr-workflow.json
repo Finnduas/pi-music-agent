@@ -1,0 +1,88 @@
+{
+  "name": "OMR Conversion Service",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "omr-conversion",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "omr-conversion"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Sheet music -> ABC conversion for the \"OMR Conversion Service\" n8n workflow.\n// POST { filename, mimeType, data(base64) } -> { abc, valid, errors[], warnings[] }.\n// Uses Audiveris (OMR -> MusicXML) then music21 (MusicXML -> ABC). Best-effort:\n// works for clean printed scores; handwritten/complex engraving is error-prone.\nconst cp = require('child_process');\nconst fs = require('fs');\nconst os = require('os');\nconst path = require('path');\n\nfunction structuralCheck(notation) {\n  const errors = [];\n  const warnings = [];\n  if (!notation || typeof notation !== 'string' || notation.trim() === '') {\n    errors.push('Empty notation.');\n    return { valid: false, errors, warnings };\n  }\n  if (!/^\\s*X\\s*:/m.test(notation)) errors.push('Missing required X: header.');\n  if (!/^\\s*K\\s*:/m.test(notation)) errors.push('Missing required K: header.');\n  if (!/^\\s*M\\s*:/m.test(notation) && !/\\[M:/.test(notation)) warnings.push('No M: meter header.');\n  if (!/^\\s*L\\s*:/m.test(notation) && !/\\[L:/.test(notation)) warnings.push('No L: default note length header.');\n  return { valid: errors.length === 0, errors, warnings };\n}\n\nfunction run(cmd, args, opts) {\n  try {\n    return { ok: true, out: cp.execFileSync(cmd, args, { encoding: 'utf8', ...opts }) };\n  } catch (e) {\n    return { ok: false, err: (e.stderr || e.message || String(e)).toString() };\n  }\n}\n\nfunction findFile(dir, re) {\n  for (const name of fs.readdirSync(dir)) {\n    const p = path.join(dir, name);\n    const st = fs.statSync(p);\n    if (st.isDirectory()) { const hit = findFile(p, re); if (hit) return hit; }\n    else if (re.test(name)) return p;\n  }\n  return null;\n}\n\nconst items = $input.all();\nconst out = [];\nfor (const item of items) {\n  const body = item.json.body || item.json;\n  const warnings = [];\n  const errors = [];\n  let abc = '';\n  try {\n    const data = body.data || '';\n    if (!data) throw new Error('Missing base64 \"data\" field.');\n    const filename = body.filename || 'score';\n    const workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'omr-'));\n    const input = path.join(workDir, filename);\n    fs.writeFileSync(input, Buffer.from(data, 'base64'));\n    const xmlDir = path.join(workDir, 'xml');\n    fs.mkdirSync(xmlDir, { recursive: true });\n\n    const audiveris = process.env.AUDIVERIS || 'audiveris';\n    const r1 = run(audiveris, ['-batch', '-export', '-output', xmlDir, input]);\n    if (!r1.ok) { warnings.push('Audiveris: ' + r1.err); throw new Error('Audiveris step failed: ' + r1.err); }\n    const musicXml = findFile(xmlDir, /\\.(mxl|musicxml|xml)$/i);\n    if (!musicXml) throw new Error('Audiveris produced no MusicXML output.');\n\n    const python = process.env.MUSIC21_PYTHON || (process.platform === 'win32' ? 'python' : 'python3');\n    const abcOut = path.join(workDir, 'score.abc');\n    const py =\n      'from music21 import converter\\n' +\n      \"s = converter.parse(r'\" + musicXml + \"')\\n\" +\n      \"s.write('abc', fp=r'\" + abcOut + \"')\";\n    const r2 = run(python, ['-c', py]);\n    if (!r2.ok) { warnings.push('music21: ' + r2.err); throw new Error('music21 step failed: ' + r2.err); }\n    abc = fs.readFileSync(abcOut, 'utf8');\n    fs.rmSync(workDir, { recursive: true, force: true });\n  } catch (e) {\n    errors.push(e.message || String(e));\n  }\n  const struct = structuralCheck(abc);\n  out.push({ json: {\n    abc,\n    valid: errors.length === 0 && struct.valid,\n    errors: [...errors, ...struct.errors],\n    warnings: [...warnings, ...struct.warnings],\n  }});\n}\nreturn out;\n"
+      },
+      "id": "convert-1",
+      "name": "Convert sheet music to ABC",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-1",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        740,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Convert sheet music to ABC",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Convert sheet music to ABC": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "instanceId": "pi-music-agent-omr",
+    "description": "Sheet music -> ABC. POST { filename, mimeType, data(base64) } -> { abc, valid, errors[], warnings[] }. No LLM, no loop, no storage."
+  },
+  "tags": [
+    {
+      "name": "pi-music-agent"
+    }
+  ]
+}

@@ -23,6 +23,7 @@ export interface RoleConfig {
 export interface AppConfig {
   storage: {
     dir: string;
+    inputDir?: string;
     database?: string;
   };
   providers: Record<ProviderName, ProviderConfig>;
@@ -33,6 +34,11 @@ export interface AppConfig {
   validation: {
     backend: "local" | "n8n";
     n8n: { webhookUrl: string; timeoutMs: number };
+  };
+  conversion: {
+    backend: "none" | "local" | "n8n";
+    n8n: { webhookUrl: string; timeoutMs: number };
+    local: { audiveris: string; music21: string };
   };
   render: {
     prefer: string[];
@@ -48,7 +54,7 @@ export interface AppConfig {
 }
 
 const DEFAULTS: AppConfig = {
-  storage: { dir: "./compositions" },
+  storage: { dir: "./output", inputDir: "./input" },
   providers: {
     openrouter: {
       baseUrl: "https://openrouter.ai/api/v1",
@@ -62,15 +68,15 @@ const DEFAULTS: AppConfig = {
   roles: {
     composer: {
       provider: "openrouter",
-      model: "anthropic/claude-sonnet-4",
+      model: "anthropic/claude-sonnet-5.5",
       temperature: 0.9,
       maxTokens: 4096,
     },
     critic: {
       provider: "openrouter",
-      model: "anthropic/claude-sonnet-4",
+      model: "anthropic/claude-sonnet-5.5",
       temperature: 0.2,
-      maxTokens: 2048,
+      maxTokens: 4096,
     },
   },
   validation: {
@@ -79,6 +85,14 @@ const DEFAULTS: AppConfig = {
       webhookUrl: "http://localhost:5678/webhook/notation-validation",
       timeoutMs: 15000,
     },
+  },
+  conversion: {
+    backend: "none",
+    n8n: {
+      webhookUrl: "http://localhost:5678/webhook/omr-conversion",
+      timeoutMs: 120000,
+    },
+    local: { audiveris: "audiveris", music21: "python" },
   },
   render: {
     prefer: ["abc2svg", "abcm2ps"],
@@ -134,6 +148,38 @@ export function resolveConfigPath(explicit?: string): string | undefined {
   return candidates.find((p) => fs.existsSync(p));
 }
 
+/** Clamp loop/timeout values so a bad config cannot dead-end or no-op the loop. */
+function sanitizeConfig(cfg: AppConfig): AppConfig {
+  const clamp = (value: number, min: number, max: number, fallback: number, label: string) => {
+    if (Number.isFinite(value) && value >= min && value <= max) return value;
+    console.error(`[config] ${label} must be ${min}..${max}; got ${value}, using ${fallback}.`);
+    return fallback;
+  };
+  cfg.loop.scoreThreshold = clamp(cfg.loop.scoreThreshold, 0, 10, 8, "loop.scoreThreshold");
+  cfg.loop.maxIterations = clamp(
+    cfg.loop.maxIterations,
+    1,
+    Number.POSITIVE_INFINITY,
+    3,
+    "loop.maxIterations",
+  );
+  cfg.loop.maxValidationRetries = clamp(
+    cfg.loop.maxValidationRetries,
+    1,
+    Number.POSITIVE_INFINITY,
+    5,
+    "loop.maxValidationRetries",
+  );
+  cfg.validation.n8n.timeoutMs = clamp(
+    cfg.validation.n8n.timeoutMs,
+    1,
+    Number.POSITIVE_INFINITY,
+    15000,
+    "validation.n8n.timeoutMs",
+  );
+  return cfg;
+}
+
 export function loadConfig(explicit?: string): AppConfig {
   const configPath = resolveConfigPath(explicit);
   let raw: unknown = {};
@@ -164,5 +210,8 @@ export function loadConfig(explicit?: string): AppConfig {
   }
 
   cfg.storage.dir = path.resolve(process.cwd(), cfg.storage.dir);
-  return cfg;
+  if (cfg.storage.inputDir) {
+    cfg.storage.inputDir = path.resolve(process.cwd(), cfg.storage.inputDir);
+  }
+  return sanitizeConfig(cfg);
 }

@@ -9,12 +9,13 @@ import type { AppConfig } from "../config.js";
 import { projectRoot } from "../config.js";
 import { clientForRole, describeRole } from "../llm/roles.js";
 import { extractAbc, extractJson } from "../llm/parse.js";
+import { analyzeScore, formatAnalysis } from "../music/abc.js";
 import { createValidator } from "../validate/validator.js";
 import { renderAbc } from "../render/renderer.js";
 import { Store } from "../store/store.js";
 import type { ComposeRequest, ComposeResult, CriticReport } from "../types.js";
 
-async function loadPrompt(name: string, fallback: string): Promise<string> {
+export async function loadPrompt(name: string, fallback: string): Promise<string> {
   try {
     return await fs.readFile(path.join(projectRoot, "prompts", `${name}.md`), "utf8");
   } catch {
@@ -22,7 +23,7 @@ async function loadPrompt(name: string, fallback: string): Promise<string> {
   }
 }
 
-function slugify(s: string): string {
+export function slugify(s: string): string {
   return (
     s
       .toLowerCase()
@@ -32,7 +33,28 @@ function slugify(s: string): string {
   );
 }
 
-function coerceReport(raw: any, fallbackText: string): CriticReport {
+function factsBlock(abc: string): string {
+  return `Score facts (deterministic, approximate):\n${formatAnalysis(analyzeScore(abc))}\n`;
+}
+
+async function askComposer(
+  composer: RoleCompleter,
+  system: string,
+  user: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  if (composer.completeWithTools) return composer.completeWithTools(system, user, signal);
+  return composer.complete(system, user, signal);
+}
+
+export function salvageScore(text: string): number {
+  const m = text.match(/"score"\s*:\s*(\d+(?:\.\d+)?)/);
+  if (!m) return 0;
+  const n = Number.parseFloat(m[1]);
+  return Number.isFinite(n) ? Math.max(0, Math.min(10, n)) : 0;
+}
+
+export function coerceReport(raw: any, fallbackText: string): CriticReport {
   const num = Number(raw?.score);
   return {
     score: Number.isFinite(num) ? Math.max(0, Math.min(10, num)) : 0,
@@ -46,6 +68,8 @@ function coerceReport(raw: any, fallbackText: string): CriticReport {
 
 export interface RoleCompleter {
   complete(system: string, user: string, signal?: AbortSignal): Promise<string>;
+  /** Optional native tool-calling path (used for the composer when available). */
+  completeWithTools?(system: string, user: string, signal?: AbortSignal): Promise<string>;
 }
 
 export interface ComposeDeps {
@@ -100,11 +124,16 @@ export async function composePiece(
     say("Starting from supplied ABC (skipping initial composition).");
   } else {
     say("Composing initial sketch...");
+    const refBlock = req.references?.length
+      ? `\nReference material (emulate the style/technique, do not copy):\n${req.references
+          .map((r, i) => `\`\`\`abc\n${r.slice(0, 4000)}\n\`\`\``)
+          .join("\n")}`
+      : "";
     const user =
       `Compose a piece.\n\nRequest: ${req.request}\n${styleLine}` +
-      `Title suggestion: ${title}\n\n` +
+      `Title suggestion: ${title}\n${refBlock}\n` +
       `Return the full ABC score in a single \`\`\`abc fenced block.`;
-    abc = extractAbc(await composer.complete(composerSystem, user));
+    abc = extractAbc(await askComposer(composer, composerSystem, user));
     say(`Received ${abc.split("\n").length} lines of ABC.`);
   }
 
@@ -127,8 +156,8 @@ export async function composePiece(
         `The following ABC score FAILED validation. Fix EVERY error and return the ` +
         `complete corrected score in a \`\`\`abc fenced block.\n\n` +
         `Errors:\n${v.errors.map((e) => `- ${e}`).join("\n")}\n\n` +
-        `Original request: ${req.request}\n\nCurrent ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
-      abc = extractAbc(await composer.complete(composerSystem, user));
+        `Original request: ${req.request}\n\n${factsBlock(abc)}Current ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
+      abc = extractAbc(await askComposer(composer, composerSystem, user));
       say("Resubmitted corrected ABC.");
     }
     return false;
@@ -146,14 +175,15 @@ export async function composePiece(
     say(`Critique pass ${iterations}/${cfg.loop.maxIterations}...`);
     const user =
       `Original request: ${req.request}\n${styleLine}` +
-      `Evaluate the following ABC score.\n\n\`\`\`abc\n${abc}\n\`\`\``;
+      `${factsBlock(abc)}Evaluate the following ABC score.\n\n\`\`\`abc\n${abc}\n\`\`\``;
     let report: CriticReport;
+    let text = "";
     try {
-      const text = await critic.complete(criticSystem, user);
+      text = await critic.complete(criticSystem, user);
       report = coerceReport(extractJson<any>(text), text);
     } catch (e: any) {
-      say(`Critic response unparseable (${e?.message ?? e}); treating as score 0.`);
-      report = coerceReport({ score: 0, summary: "Critic output unparseable." }, "");
+      say(`Critic response unparseable (${e?.message ?? e}); salvaging score from raw text.`);
+      report = coerceReport({ score: salvageScore(text), summary: "Critic output unparseable." }, text);
     }
     criticReport = report;
     say(`Score: ${report.score}/10 - ${report.summary}`);
@@ -175,8 +205,8 @@ export async function composePiece(
       `Critic issues:\n${report.issues.map((i) => `- ${i}`).join("\n") || "- (none listed)"}\n\n` +
       `Suggested revisions:\n${report.suggestions.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +
       `Strengths to preserve:\n${report.strengths.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +
-      `Current ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
-    abc = extractAbc(await composer.complete(composerSystem, reviseUser));
+      `${factsBlock(abc)}Current ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
+    abc = extractAbc(await askComposer(composer, composerSystem, reviseUser));
     valid = await ensureValid("revision");
   }
 

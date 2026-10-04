@@ -3,10 +3,11 @@
 # Copy to `config.yaml` and edit. The file `config.yaml` is git-ignored.
 # ---------------------------------------------------------------------------
 
-# Where rendered pieces, ABC sources and the index DB are stored.
+# Where source sheets are dropped and rendered pieces are written.
 storage:
-  dir: "./compositions"      # folder for .abc / .svg / .html outputs
-  # database: "./compositions/index.db"   # uncomment to use SQLite index
+  inputDir: "./input"        # drop PDF/image sheet music or ABC here
+  dir: "./output"            # rendered .abc / .svg / .html outputs
+  # database: "./output/index.db"   # uncomment to use SQLite index
 
 # -------- LLM providers: one OpenAI-compatible client, switchable base_url --
 providers:
@@ -25,14 +26,14 @@ providers:
 roles:
   composer:
     provider: openrouter
-    model: "anthropic/claude-sonnet-4"
+    model: "anthropic/claude-sonnet-5.5"
     temperature: 0.9
     maxTokens: 4096
   critic:
     provider: openrouter
-    model: "anthropic/claude-sonnet-4"
+    model: "anthropic/claude-sonnet-5.5"
     temperature: 0.2
-    maxTokens: 2048
+    maxTokens: 4096
 
   # --- Fully local example (install Ollama + `ollama pull qwen2.5:14b`) -----
   # composer: { provider: ollama, model: "qwen2.5:14b", temperature: 0.9 }
@@ -44,6 +45,16 @@ validation:
   n8n:
     webhookUrl: "http://localhost:5678/webhook/notation-validation"
     timeoutMs: 15000
+
+# -------- Sheet music -> ABC conversion (OMR stretch goal) -------------------
+conversion:
+  backend: "none"            # "none" | "n8n" | "local"
+  n8n:                       # import src/convert/n8n-omr-workflow.json into n8n
+    webhookUrl: "http://localhost:5678/webhook/omr-conversion"
+    timeoutMs: 120000
+  local:                     # "local" needs Audiveris + Python music21 installed
+    audiveris: "audiveris"
+    music21: "python"
 
 # -------- Rendering ---------------------------------------------------------
 render:

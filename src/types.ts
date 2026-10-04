@@ -33,6 +33,8 @@ export interface ComposeRequest {
   title?: string;
   /** If provided, skip composition and start from this ABC. */
   existingAbc?: string;
+  /** Reference ABC scores to emulate (e.g. pieces dropped in the input folder). */
+  references?: string[];
 }
 
 export interface ComposeResult extends CompositionMeta {

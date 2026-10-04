@@ -2,9 +2,26 @@
 // Copyright (C) 2026 Finnduas
 /** Minimal OpenAI-compatible chat client (OpenRouter, Ollama, any /v1 server). */
 
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface ToolSpec {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+}
+
 export interface ChatMessage {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_call_id?: string;
+  toolCalls?: ToolCall[];
 }
 
 export interface ChatOptions {
@@ -12,12 +29,14 @@ export interface ChatOptions {
   temperature?: number;
   maxTokens?: number;
   signal?: AbortSignal;
+  tools?: ToolSpec[];
 }
 
 export interface ChatResult {
   content: string;
   model: string;
   usage?: { promptTokens?: number; completionTokens?: number };
+  toolCalls?: ToolCall[];
 }
 
 export interface ClientConfig {
@@ -44,6 +63,7 @@ export class OpenAICompatClient {
         temperature: opts.temperature,
         max_tokens: opts.maxTokens,
         stream: false,
+        ...(opts.tools?.length ? { tools: opts.tools, tool_choice: "auto" } : {}),
       }),
       signal: opts.signal,
     });
@@ -55,7 +75,15 @@ export class OpenAICompatClient {
       );
     }
     const json: any = await res.json();
-    const content: string = json?.choices?.[0]?.message?.content ?? "";
+    const msg = json?.choices?.[0]?.message ?? {};
+    const content: string = msg.content ?? "";
+    const toolCalls: ToolCall[] | undefined = Array.isArray(msg.tool_calls)
+      ? msg.tool_calls.map((tc: any) => ({
+          id: tc.id,
+          name: tc.function?.name,
+          arguments: tc.function?.arguments ?? "{}",
+        }))
+      : undefined;
     return {
       content,
       model: json?.model ?? opts.model,
@@ -63,6 +91,7 @@ export class OpenAICompatClient {
         promptTokens: json?.usage?.prompt_tokens,
         completionTokens: json?.usage?.completion_tokens,
       },
+      toolCalls: toolCalls?.length ? toolCalls : undefined,
     };
   }
 }

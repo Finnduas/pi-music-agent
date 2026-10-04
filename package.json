@@ -34,7 +34,8 @@
     "dev": "tsx src/cli.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "gen:n8n": "node scripts/gen-n8n-workflow.mjs",
-    "smoke": "tsx scripts/smoke-loop.ts && tsx scripts/smoke-n8n.ts"
+    "gen:n8n:omr": "node scripts/gen-n8n-omr-workflow.mjs",
+    "smoke": "tsx scripts/smoke-music.ts && tsx scripts/smoke-render.ts && tsx scripts/smoke-convert.ts && tsx scripts/smoke-loop.ts && tsx scripts/smoke-n8n.ts"
   },
   "dependencies": {
     "abcjs": "^6.4.4",
