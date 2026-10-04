@@ -28,10 +28,6 @@ export interface ScoreAnalysis {
 }
 
 const NATURAL_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
-const SHARP_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
-
-/** A single note atom: accidental + letter + octave markers + duration. */
-const NOTE_RE = /([=_^]{0,2})([a-gA-G])([',]*)([0-9]*\/?[0-9]*)/g;
 
 export interface Headers {
   x?: string;
@@ -108,7 +104,9 @@ export function tonicOf(key: string | undefined): Tonic {
   const accidental = m[2];
   const rest = m[3].toLowerCase();
   const pc = pitchClassOf(accidental === "#" ? "^" : accidental === "b" ? "_" : "", letter);
-  const minor = /m|min|dor|aeo|loc|phr/.test(rest);
+  // "m", "min", "aeo" are minor; dorian/phrygian/locrian are minor-ish modes.
+  // "maj", "mix", "lyd", "ion" and words like clef=bass are not.
+  const minor = /^(m(?![a-z])|min|aeo|dor|phr|loc)/.test(rest.trim());
   const name = letter + (accidental === "#" ? "#" : accidental === "b" ? "b" : "");
   return { name, pc, minor };
 }
@@ -116,31 +114,56 @@ export function tonicOf(key: string | undefined): Tonic {
 /** Approximate count of written measures (barlines + leading bar, best-effort). */
 export function countBars(abc: string): number {
   const cleaned = bodyOf(abc)
-    .replace(/\[[^\]]*\]/g, "") // drop chord/directive groups
+    .replace(/\[[^\]|]*\]/g, "") // drop chord/directive groups (never a [| barline)
     .replace(/\{[^}]*\}/g, "") // drop grace notes
     .replace(/"[^"]*"/g, "") // drop text annotations
     .replace(/%[^\n]*/g, ""); // drop comments
   const normalized = cleaned
     .replace(/\|\||\[\||\|\]|\|:/g, "|")
     .replace(/:\|/g, "|")
-    .replace(/\|+/g, "|");
+    .replace(/\|+/g, "|")
+    .replace(/^\s*\|/, ""); // an opening barline does not close a measure
   const bars = (normalized.match(/\|/g) ?? []).length;
   // A bar line closes a measure; the tune opening bar is implied.
   return Math.max(0, bars);
 }
 
+/** Pitch class of the last sounding note, honouring the key signature and bar accidentals. */
 function lastNotePc(abc: string): number | null {
+  let sig = signatureOf(fifthsOf(parseKey(parseHeaders(abc).k ?? "C")));
   const body = bodyOf(abc)
-    .replace(/"[^"]*"/g, "")
-    .replace(/%[^\n]*/g, "");
+    .replace(/"[^"]*"/g, "") // annotations / chord symbols
+    .replace(/%[^\n]*/g, "") // comments
+    .replace(/![^!\n]*!|\+[^+\s]*\+/g, ""); // decorations
   let last: number | null = null;
   for (const line of body.split(/\r?\n/)) {
-    if (/^\s*(w|s)\s*:/i.test(line)) continue; // lyrics / symbol lines
-    for (const m of line.matchAll(new RegExp(NOTE_RE.source, "g"))) {
-      const acc = m[1] ?? "";
-      const letter = m[2] ?? m[0];
-      if (!/[a-gA-G]/.test(letter)) continue;
-      last = pitchClassOf(acc === "=" ? "" : acc, letter);
+    const field = /^\s*([A-Za-z])\s*:\s*(.*)$/.exec(line);
+    if (field) {
+      if (field[1].toUpperCase() === "K") sig = signatureOf(fifthsOf(parseKey(field[2])));
+      continue; // lyrics, voice and other info lines hold no notes
+    }
+    const inBar = new Map<string, number>();
+    const re = /\[([A-Za-z]):([^\]]*)\]|(\|)|([=_^]{0,2})([a-gA-G])([',]*)/g;
+    for (const m of line.matchAll(re)) {
+      if (m[1]) {
+        if (m[1].toUpperCase() === "K") sig = signatureOf(fifthsOf(parseKey(m[2])));
+        continue;
+      }
+      if (m[3]) {
+        inBar.clear();
+        continue;
+      }
+      const acc = m[4] ?? "";
+      const letter = m[5].toUpperCase();
+      const id = m[5] + (m[6] ?? "");
+      let semis = sig[LETTERS.indexOf(letter)];
+      if (acc) {
+        semis = acc === "=" ? 0 : accidentalSemitones(acc);
+        inBar.set(id, semis);
+      } else if (inBar.has(id)) {
+        semis = inBar.get(id)!;
+      }
+      last = (((NATURAL_PC[letter] + semis) % 12) + 12) % 12;
     }
   }
   return last;
