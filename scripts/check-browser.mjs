@@ -113,6 +113,30 @@ try {
   check("score renders as sheet music", page?.svg > 0 && page?.notes > 0, `${page?.notes ?? 0} notes`);
   check("browser supports audio", page?.audio === true);
 
+  // Readability in light AND dark mode (dark mode once made notes light grey on white).
+  const contrastJs = `(function () {
+    function rgb(s) { var m = s.match(/[\\d.]+/g) || [0, 0, 0]; return m.slice(0, 3).map(Number); }
+    function lum(c) { return c.map(function (v) { v /= 255; return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4); })
+      .reduce(function (a, v, i) { return a + v * [0.2126, 0.7152, 0.0722][i]; }, 0); }
+    function ratio(a, b) { var x = lum(rgb(a)), y = lum(rgb(b)); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
+    var note = document.querySelector('#paper .abcjs-note path') || document.querySelector('#paper path');
+    var btn = document.getElementById('btn-play');
+    return {
+      notes: ratio(getComputedStyle(note).fill, getComputedStyle(document.getElementById('paper')).backgroundColor),
+      buttons: ratio(getComputedStyle(btn).color, getComputedStyle(btn).backgroundColor),
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1
+    };
+  })()`;
+  for (const scheme of ["light", "dark"]) {
+    await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
+    await sleep(300);
+    const c = await js(contrastJs);
+    check(`${scheme} mode: notes clearly visible`, c?.notes >= 7, `contrast ${c?.notes?.toFixed(1)}:1, need 7`);
+    check(`${scheme} mode: buttons readable`, c?.buttons >= 4.5, `contrast ${c?.buttons?.toFixed(1)}:1, need 4.5`);
+    check(`${scheme} mode: score fits the page`, c?.overflow === false);
+  }
+  await send("Emulation.setEmulatedMedia", { features: [] });
+
   const midi = await js(`new Promise(function (resolve) {
       var oc = URL.createObjectURL, click = HTMLAnchorElement.prototype.click, out = {};
       URL.createObjectURL = function (b) { out.bytes = b.size; out.type = b.type; return oc.call(URL, b); };

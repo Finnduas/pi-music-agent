@@ -21,12 +21,12 @@ CLI; it never touches this repo's source.
 
 | You say | What happens |
 |---|---|
-| "Write me a minuet based on the work in the input folder" | `sheetmusic_compose` with `input/` as style references |
+| "Write me a minuet based on the work in the input folder" | `sheetmusic_compose` with `.input/` as style references |
 | "Fill in the gap in this piece" | `sheetmusic_analyze` finds the gap → `sheetmusic_edit` fills only those bars |
 | "Rewrite this in F major" | `sheetmusic_analyze` → compute semitones → `sheetmusic_transpose` (deterministic, no LLM) |
-| "Turn input/score.pdf into notation" | `sheetmusic_convert` (OMR via n8n or local Audiveris) |
+| "Turn .input/score.pdf into notation" | `sheetmusic_convert` (OMR via n8n or local Audiveris) |
 
-Results land in `output/` as `.abc` + an `.html` sheet-music viewer. Open it in any
+Results land in `.output/` as `.abc` + an `.html` sheet-music viewer. Open it in any
 browser: **Play** (audio), **Download MIDI**, **Print / Save PDF**, **Download .abc**.
 See [Viewing and playing ABC files](docs/USAGE.md#viewing-and-playing-abc-files).
 
@@ -46,7 +46,7 @@ node dist/cli.js edit examples/input/minuet-with-gap.abc "fill in the gap"
 node dist/cli.js compose "a wistful baroque minuet in D minor" --style baroque
 ```
 
-Open the `.html` in `output/` to see and print the score.
+Open the `.html` in `.output/` to see and print the score.
 
 ### Hook it into Pi
 
@@ -71,15 +71,15 @@ request / existing ABC
    ▼  critic LLM ── score < threshold ──► revise ──► validate
    │ good enough
    ▼
- render (HTML viewer, optional SVG) ─► store in output/
+ render (HTML viewer, optional SVG) ─► store in .output/
 ```
 
 ## Folders
 
 | Folder | Purpose |
 |---|---|
-| `input/` | drop source sheet music here (ABC, MusicXML, PDF, image) |
-| `output/` | rendered pieces land here |
+| `.input/` | drop source sheet music here (ABC, MusicXML, PDF, image) |
+| `.output/` | rendered pieces land here |
 | `src/` | the music agent (TypeScript) — see [ARCHITECTURE](docs/ARCHITECTURE.md) |
 | `prompts/` | composer and critic system prompts |
 | `pi-integration/` | Pi extension + skill |

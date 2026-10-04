@@ -25,7 +25,7 @@ OpenRouter or Ollama.
 - Keep the validation/render/store layers free of LLM-specific logic — the agent
   loop in `src/loop/orchestrator.ts` wires them together.
 - New behaviour should be covered by a `scripts/smoke-*.ts` check where practical.
-- Never commit secrets. `config.yaml`, `.env` and generated `input/*` and `output/*` are
+- Never commit secrets. `config.yaml`, `.env` and generated `.input/*` and `.output/*` are
   git-ignored on purpose.
 
 ## Pull requests

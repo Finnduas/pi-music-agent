@@ -54,7 +54,7 @@ export interface AppConfig {
 }
 
 const DEFAULTS: AppConfig = {
-  storage: { dir: "./output", inputDir: "./input" },
+  storage: { dir: "./.output", inputDir: "./.input" },
   providers: {
     openrouter: {
       baseUrl: "https://openrouter.ai/api/v1",

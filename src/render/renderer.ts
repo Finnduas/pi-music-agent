@@ -127,12 +127,16 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
 <script src="${scriptSrc}"${onerror}></script>
 <style>
   :root { color-scheme: light dark; }
+  *, *::before, *::after { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; color: #1a1a1a; }
   h1 { font-size: 1.4rem; font-weight: 600; margin-bottom: 1rem; }
-  #paper { background: #fff; overflow-x: auto; }
+  /* The score is always black ink on white paper, whatever the page theme
+     (abcjs draws notes in currentColor, so the colour must be set here). */
+  #paper { background: #fff; color: #000; overflow-x: auto; }
   pre { background: #f5f5f5; padding: 1rem; overflow: auto; border-radius: 6px; font-size: .8rem; white-space: pre-wrap; }
   .controls { margin: 1rem 0; display: flex; gap: .5rem; flex-wrap: wrap; }
-  button { padding: .45rem .9rem; border: 1px solid #c9c9c9; background: #fff; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+  button { padding: .45rem .9rem; border: 1px solid #c9c9c9; background: #fff; color: #1a1a1a; border-radius: 6px; cursor: pointer; font-size: .9rem; }
+  button:disabled { opacity: .6; cursor: progress; }
   button:hover { background: #f0f0f0; }
   #fallback { color: #a00; }
   #status { font-size: .85rem; color: #666; min-height: 1.2em; }
@@ -144,8 +148,11 @@ function htmlViewer(title: string, abc: string, scriptSrc: string): string {
   }
   @media (prefers-color-scheme: dark) {
     body { color: #e6e6e6; background: #111; }
-    #paper { background: #fff; padding: 1rem; border-radius: 6px; }
+    #paper { background: #fff; color: #000; padding: 1rem; border-radius: 6px; }
     pre { background: #1f1f1f; color: #e6e6e6; }
+    button { background: #2a2a2a; color: #e6e6e6; border-color: #4a4a4a; }
+    button:hover { background: #363636; }
+    #status { color: #aaa; }
   }
 </style>
 </head>

@@ -64,10 +64,10 @@ and a browser ready.
 |---|---|---|
 | 0 | `/music` | Extension loaded; list of commands |
 | 1 | *"Fill in the gap in examples/input/minuet-with-gap.abc"* | Pi reads the file, calls `sheetmusic_analyze` (gaps: bars 5–6), then `sheetmusic_edit` |
-| 2 | (open the new `output/*.html`) | Rendered sheet music; click **▶ Play** to hear it, **Print / Save PDF** to print |
+| 2 | (open the new `.output/*.html`) | Rendered sheet music; click **▶ Play** to hear it, **Print / Save PDF** to print |
 | 3 | *"Rewrite examples/input/ode-to-joy.abc in F major"* | `analyze` → compute 5 semitones → `sheetmusic_transpose` (instant, no LLM) |
 | 4 | *"Write me a short minuet in the style of the pieces in examples/input"* | `sheetmusic_compose` with references; ~1–2 min |
-| 5 | *"What key is output/….abc in?"* | `sheetmusic_analyze` only — free |
+| 5 | *"What key is .output/….abc in?"* | `sheetmusic_analyze` only — free |
 
 *Tips:* the compose/edit calls take 30–90 s (two LLM calls per round) — talk
 through the loop while waiting. Run step 1 once before the talk as a backup and

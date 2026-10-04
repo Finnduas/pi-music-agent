@@ -5,9 +5,9 @@
 
 # Where source sheets are dropped and rendered pieces are written.
 storage:
-  inputDir: "./input"        # drop PDF/image sheet music or ABC here
-  dir: "./output"            # rendered .abc / .svg / .html outputs
-  # database: "./output/index.db"   # uncomment to use SQLite index
+  inputDir: "./.input"        # drop PDF/image sheet music or ABC here
+  dir: "./.output"            # rendered .abc / .svg / .html outputs
+  # database: "./.output/index.db"   # uncomment to use SQLite index
 
 # -------- LLM providers: one OpenAI-compatible client, switchable base_url --
 providers:

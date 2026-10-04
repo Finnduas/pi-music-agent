@@ -6,10 +6,10 @@ dist/
 config.yaml
 .env
 # input (drop sheet music here) / output (rendered pieces)
-input/*
-!input/.gitkeep
-output/*
-!output/.gitkeep
+.input/*
+!.input/.gitkeep
+.output/*
+!.output/.gitkeep
 
 # os / editor
 .DS_Store

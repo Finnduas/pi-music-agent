@@ -61,7 +61,7 @@ async function runCli(pi: ExtensionAPI, args: string[], opts?: { timeout?: numbe
   return { ok: r.code === 0, stdout: r.stdout, stderr: r.stderr, code: r.code };
 }
 
-/** Resolve a user-supplied path: Pi's cwd first, then the music agent folder (so "input/x.abc" works). */
+/** Resolve a user-supplied path: Pi's cwd first, then the music agent folder (so ".input/x.abc" works). */
 function resolveFile(file: string): string {
   if (path.isAbsolute(file)) return file;
   const here = path.resolve(process.cwd(), file);
@@ -276,7 +276,7 @@ ${r.stderr}` }], details: { error: r.stderr } };
   });
 
   pi.registerCommand("music-edit", {
-    description: "Edit a score with an instruction, e.g. /music-edit input/piece.abc fill in the gap",
+    description: "Edit a score with an instruction, e.g. /music-edit .input/piece.abc fill in the gap",
     handler: async (args, ctx) => {
       const m = /^(S+)s+(.+)$/.exec(args.trim());
       if (!m) return notify(ctx, "usage: /music-edit <file> <instruction>", "warning");

@@ -84,7 +84,7 @@ src/
 prompts/                 composer.md, critic.md — the LLM system prompts.
 pi-integration/          sheet-music.ts (Pi extension) + skills/sheet-music/.
 scripts/                 n8n workflow generators + offline smoke tests.
-examples/  input/  output/  docs/
+examples/  .input/  .output/  docs/
 ```
 
 **Layering rule:** `validate/`, `render/`, `store/`, `music/` know nothing about
@@ -161,7 +161,7 @@ Example: `examples/input/minuet-with-gap.abc`, 3/4 in G major, where bars 5–6 
 | 10 | **orchestrator** | Re-runs gap detection → logs *"Remaining candidate gaps: none"*. |
 | 11 | **validator** | abcjs parses the result (or the n8n webhook, if configured). If invalid, errors go back to the composer, up to `maxValidationRetries` (5). |
 | 12 | **Critic LLM** | Scores 0–10 with strengths/issues/suggestions. If score ≥ `scoreThreshold` (8) → stop. Otherwise a *revise* pass runs (with "change nothing outside the edited passage") and we loop, up to `maxIterations` (3). |
-| 13 | **renderer + store** | Writes `output/<title>-<id>.abc`, `.html` (offline viewer), a `.json` record, and appends `index.jsonl`. |
+| 13 | **renderer + store** | Writes `.output/<title>-<id>.abc`, `.html` (offline viewer), a `.json` record, and appends `index.jsonl`. |
 | 14 | **Extension → Pi** | Returns title, critic score, file paths and the ABC to Pi. |
 | 15 | **Pi → You** | "The gap in bars 5–6 has been filled with `B c d | e d c |` … output files: …" |
 

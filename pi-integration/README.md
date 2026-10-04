@@ -28,11 +28,11 @@ Then start Pi in that project (or anywhere) and it discovers both. Set
 ## What the user can say in Pi
 
 - `"write me a minuet based on the work in the input folder"` → Pi reads
-  `input/*.abc`, then runs `/compose … --refs input`.
+  `.input/*.abc`, then runs `/compose … --refs .input`.
 - `"rewrite this in F major"` → Pi analyzes the key, computes the semitone
   offset, then runs `/music-transpose <file> <semitones>`.
-- `"fill in the gap in input/piece.abc"` → `sheetmusic_analyze` finds the gap, then `sheetmusic_edit` fills it.
-- `"turn input/score.pdf into notation"` → Pi runs `/music-convert input/score.pdf`.
+- `"fill in the gap in .input/piece.abc"` → `sheetmusic_analyze` finds the gap, then `sheetmusic_edit` fills it.
+- `"turn .input/score.pdf into notation"` → Pi runs `/music-convert .input/score.pdf`.
 
 The skill keeps Pi honest: it composes/mutates **music**, and if asked to change
 the music tool's code, it says so and switches to normal code-editing.
@@ -53,7 +53,7 @@ the music tool's code, it says so and switches to normal code-editing.
 `/music-convert` · `/music-render` · `/music-validate` · `/music-list`
 
 Relative file paths are resolved against Pi's working directory first, then the
-music agent folder (so `input/piece.abc` works from anywhere).
+music agent folder (so `.input/piece.abc` works from anywhere).
 
 After changing the extension or skill, run `/reload` in Pi. The extension runs
 the *built* CLI, so run `npm run build` in the music agent after pulling changes.

@@ -12,12 +12,12 @@ and report the results. Do not modify files under the music agent's `src/`,
 
 ## Folders
 
-- `input/` — drop source sheet music here (PDF, image, MusicXML, or ABC).
-- `output/` — rendered pieces land here (`.abc`, `.svg`, `.html` + viewer).
+- `.input/` — drop source sheet music here (PDF, image, MusicXML, or ABC).
+- `.output/` — rendered pieces land here (`.abc`, `.svg`, `.html` + viewer).
 
 ## Slash commands (preferred, available in Pi)
 
-- `/compose <request>` — write a piece (add `--style <s>`, `--refs input`).
+- `/compose <request>` — write a piece (add `--style <s>`, `--refs .input`).
 - `/music-list` — list stored compositions.
 - `/music-analyze <file>` — bars, meter, key, tonic, voices.
 - `/music-edit <file> <instruction>` — change an existing piece ("fill in the gap").
@@ -37,13 +37,13 @@ and report the results. Do not modify files under the music agent's `src/`,
 ## Worked examples
 
 **"Write me a minuet based on the work in the input folder."**
-1. Look at `input/*.abc` (convert any PDFs/images there first with `sheetmusic_convert`).
-2. `/compose a minuet in the style of the input pieces --refs input`.
+1. Look at `.input/*.abc` (convert any PDFs/images there first with `sheetmusic_convert`).
+2. `/compose a minuet in the style of the input pieces --refs .input`.
 
 **"Fill in the gap in this piece."**
 1. `sheetmusic_analyze { file }` — it lists candidate gaps (rest-only or `"^GAP"` bars).
 2. `sheetmusic_edit { file, instruction: "fill in the gap in bars 5-6, ..." }`. Include the bar numbers from step 1.
-3. Tell the user where the result was written (`output/`) and the critic score.
+3. Tell the user where the result was written (`.output/`) and the critic score.
 
 **"Rewrite this in F major."**
 1. `runCli` `analyze <file>` to find the current tonic.

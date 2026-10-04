@@ -109,7 +109,7 @@ sudo apt-get install -y default-jre
 CLI example:
 
 ```bash
-audiveris -batch -export -output ./out ./input.pdf
+audiveris -batch -export -output ./out ./.input.pdf
 ```
 
 ### music21 or verovio (MusicXML → ABC)
@@ -159,5 +159,5 @@ Webhook (PDF/image)
   ```
 
 - `better-sqlite3` is an **optional** dependency. If its native build fails, the
-  store transparently falls back to `output/index.jsonl`; set
+  store transparently falls back to `.output/index.jsonl`; set
   `storage.database` only if you want the SQLite index.

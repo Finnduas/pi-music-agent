@@ -30,7 +30,7 @@ program
   .option("-s, --style <style>", "style/period hint, e.g. baroque, romantic")
   .option("-t, --title <title>", "title for the piece")
   .option("-f, --file <abc>", "start from an existing ABC file instead of composing")
-  .option("-r, --refs <dir>", "read reference .abc files from a dir (e.g. input/) to emulate")
+  .option("-r, --refs <dir>", "read reference .abc files from a dir (e.g. .input/) to emulate")
   .option("-c, --config <path>", "path to config.yaml")
   .option("--dry-run", "skip rendering and storage", false)
   .option("--json", "emit the full result as JSON on stdout", false)

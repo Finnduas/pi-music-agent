@@ -88,7 +88,7 @@ Contract: `POST { notation, title?, style? }` →
 
 ## Viewing and playing ABC files
 
-**Easiest: the generated `.html` viewer** (next to every `.abc` in `output/`).
+**Easiest: the generated `.html` viewer** (next to every `.abc` in `.output/`).
 Double-click it to open it in any browser. It needs no install.
 
 | Button | Does | Offline? |
@@ -104,7 +104,7 @@ plays, stops, MIDI). Add `--full` to also wait until the piece finishes.
 Render a viewer for any ABC file (e.g. one you wrote yourself):
 
 ```bash
-node dist/cli.js render my_piece.abc --formats html     # -> output/my_piece.html
+node dist/cli.js render my_piece.abc --formats html     # -> .output/my_piece.html
 ```
 
 **Other programs** (if you want to *edit* ABC with live preview + playback):
@@ -142,8 +142,8 @@ cat my_piece.abc | npx tsx src/cli.ts validate -
 npx tsx src/cli.ts render my_piece.abc -o out/
 npx tsx src/cli.ts render my_piece.abc -o out/ --formats svg,html
 
-# Compose in the style of pieces dropped in input/
-npx tsx src/cli.ts compose "a minuet in the style of the input pieces" --refs input
+# Compose in the style of pieces dropped in .input/
+npx tsx src/cli.ts compose "a minuet in the style of the input pieces" --refs .input
 
 # Rewrite a piece in another key (transpose by semitones)
 npx tsx src/cli.ts transpose 2 my_piece.abc    # +2 semitones (D -> E)
@@ -152,7 +152,7 @@ npx tsx src/cli.ts transpose 2 my_piece.abc    # +2 semitones (D -> E)
 npx tsx src/cli.ts analyze my_piece.abc
 
 # Convert sheet music (PDF/image/MusicXML) -> ABC (needs an OMR backend)
-npx tsx src/cli.ts convert input/score.pdf
+npx tsx src/cli.ts convert .input/score.pdf
 
 # Interactive multi-turn editor (load, edit, critique, transpose, save)
 npx tsx src/cli.ts session -f my_piece.abc
@@ -181,8 +181,8 @@ npm run smoke       # full agent loop with fake LLMs + n8n backend mock
 ## Storage layout
 
 ```
-input/                            # drop sheet music (PDF/image/MusicXML/ABC) here
-output/                           # rendered pieces land here
+.input/                            # drop sheet music (PDF/image/MusicXML/ABC) here
+.output/                           # rendered pieces land here
   <timestamp>-<title>-<id>.abc    # the score
   <timestamp>-<title>-<id>.html   # offline abcjs viewer (open to print/save PDF)
   <timestamp>-<title>-<id>.svg    # if an SVG engine is installed
