@@ -159,5 +159,5 @@ Webhook (PDF/image)
   ```
 
 - `better-sqlite3` is an **optional** dependency. If its native build fails, the
-  store transparently falls back to `compositions/index.jsonl`; set
+  store transparently falls back to `output/index.jsonl`; set
   `storage.database` only if you want the SQLite index.

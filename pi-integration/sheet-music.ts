@@ -61,6 +61,18 @@ async function runCli(pi: ExtensionAPI, args: string[], opts?: { timeout?: numbe
   return { ok: r.code === 0, stdout: r.stdout, stderr: r.stderr, code: r.code };
 }
 
+/** Resolve a user-supplied path: Pi's cwd first, then the music agent folder (so "input/x.abc" works). */
+function resolveFile(file: string): string {
+  if (path.isAbsolute(file)) return file;
+  const here = path.resolve(process.cwd(), file);
+  if (fs.existsSync(here)) return here;
+  if (MUSIC_DIR) {
+    const there = path.resolve(MUSIC_DIR, file);
+    if (fs.existsSync(there)) return there;
+  }
+  return here;
+}
+
 function truncate(s: string, n: number): string {
   return s.length > n ? s.slice(0, n) + "\n…(truncated)" : s;
 }
@@ -83,7 +95,7 @@ export default function (pi: ExtensionAPI) {
       title: Type.Optional(Type.String({ description: "Optional title" })),
       refDir: Type.Optional(Type.String({ description: "Directory of reference .abc files to emulate (e.g. the input folder)" })),
     }),
-    async execute(_id, params, signal) {
+    async execute(_id, params, signal): Promise<any> {
       const args = ["compose", params.request, "--json"];
       if (params.style) args.push("--style", params.style);
       if (params.title) args.push("--title", params.title);
@@ -121,8 +133,8 @@ export default function (pi: ExtensionAPI) {
       file: Type.String({ description: "Path to the .abc file to transpose" }),
       semitones: Type.Number({ description: "Number of semitones (negative to go down)" }),
     }),
-    async execute(_id, params, signal) {
-      const r = await runCli(pi, ["transpose", String(params.semitones), params.file], { signal });
+    async execute(_id, params, signal): Promise<any> {
+      const r = await runCli(pi, ["transpose", String(params.semitones), resolveFile(params.file)], { signal });
       if (!r.ok) return { content: [{ type: "text", text: `Transpose failed:\n${r.stderr}` }], details: { error: r.stderr } };
       const outPath = r.stdout.replace("wrote ", "").trim();
       const abc = await readAbc(outPath).catch(() => "");
@@ -141,8 +153,8 @@ export default function (pi: ExtensionAPI) {
     parameters: Type.Object({
       file: Type.String({ description: "Path to a PDF/image/MusicXML file (or .abc to validate+copy)" }),
     }),
-    async execute(_id, params, signal) {
-      const r = await runCli(pi, ["convert", params.file, "--json"], { signal });
+    async execute(_id, params, signal): Promise<any> {
+      const r = await runCli(pi, ["convert", resolveFile(params.file), "--json"], { signal });
       if (!r.ok) return { content: [{ type: "text", text: `Conversion failed:\n${r.stderr}\n${r.stdout}` }], details: { error: r.stderr } };
       let rec: any = null;
       try { rec = JSON.parse(r.stdout); } catch { return { content: [{ type: "text", text: r.stdout }], details: {} }; }
@@ -152,6 +164,50 @@ export default function (pi: ExtensionAPI) {
         ],
         details: { valid: rec.valid, backend: rec.backend, abc: rec.abc, errors: rec.errors, warnings: rec.warnings },
       };
+    },
+  });
+
+  pi.registerTool({
+    name: "sheetmusic_analyze",
+    label: "Analyze sheet music",
+    description:
+      "Deterministically analyze an ABC file: bars, meter, key, tonic, voices, whether it ends on the tonic, and candidate GAPS (rest-only or 'GAP'-marked bars). Free and instant (no LLM). Call this FIRST for 'what key is this' or 'fill in the gap' requests.",
+    parameters: Type.Object({
+      file: Type.String({ description: "Path to the .abc file" }),
+    }),
+    async execute(_id, params, signal): Promise<any> {
+      const r = await runCli(pi, ["analyze", resolveFile(params.file)], { signal });
+      if (!r.ok) return { content: [{ type: "text", text: `Analyze failed:
+${r.stderr}` }], details: { error: r.stderr } };
+      return { content: [{ type: "text", text: r.stdout.trim() }], details: { file: params.file } };
+    },
+  });
+
+  pi.registerTool({
+    name: "sheetmusic_edit",
+    label: "Edit sheet music",
+    description:
+      "Edit an existing ABC score with a natural-language instruction, e.g. 'fill in the gap', 'make bars 5-8 more lyrical'. Keeps everything else unchanged, then validates, critiques and renders the result. Use sheetmusic_analyze first to see where the gaps are.",
+    parameters: Type.Object({
+      file: Type.String({ description: "Path to the .abc file to edit" }),
+      instruction: Type.String({ description: "What to change, e.g. 'fill in the gap in bars 5-6'" }),
+      style: Type.Optional(Type.String({ description: "Style/period hint" })),
+    }),
+    async execute(_id, params, signal): Promise<any> {
+      const args = ["edit", resolveFile(params.file), params.instruction, "--json"];
+      if (params.style) args.push("--style", params.style);
+      const r = await runCli(pi, args, { timeout: 600000, signal });
+      if (!r.ok) return { content: [{ type: "text", text: `Edit failed:\n${r.stderr}\n${r.stdout}` }], details: { error: r.stderr } };
+      let rec: any = null;
+      try { rec = JSON.parse(r.stdout); } catch { return { content: [{ type: "text", text: r.stdout }], details: {} }; }
+      const text = [
+        `Edited "${rec.title}" (id ${rec.id}) — critic ${rec.critic?.score ?? "n/a"}/10`,
+        `Files: ${(rec.files ?? []).join(", ") || "(none)"}`,
+        "",
+        "ABC notation:",
+        truncate(rec.abc ?? "", 6000),
+      ].join("\n");
+      return { content: [{ type: "text", text }], details: { id: rec.id, files: rec.files, abc: rec.abc, score: rec.critic?.score } };
     },
   });
 
@@ -188,7 +244,7 @@ export default function (pi: ExtensionAPI) {
     description: "Show sheet-music agent status and commands",
     handler: async (_args, ctx) => {
       const dir = MUSIC_DIR ?? "(not found — set MUSIC_AGENT_DIR)";
-      notify(ctx, `pi-music-agent: ${dir}\nCommands: /compose /music-list /music-analyze /music-transpose /music-render /music-validate /music-convert`, "info");
+      notify(ctx, `pi-music-agent: ${dir}\nCommands: /compose /music-edit /music-list /music-analyze /music-transpose /music-render /music-validate /music-convert`, "info");
     },
   });
 
@@ -204,7 +260,7 @@ export default function (pi: ExtensionAPI) {
     description: "Analyze an ABC file (bars, meter, key, tonic, voices)",
     handler: async (args, ctx) => {
       if (!args.trim()) return notify(ctx, "usage: /music-analyze <file>", "warning");
-      const r = await runCli(pi, ["analyze", args.trim()]);
+      const r = await runCli(pi, ["analyze", resolveFile(args.trim())]);
       notify(ctx, r.ok ? r.stdout.trim() : r.stderr, r.ok ? "info" : "error");
     },
   });
@@ -214,8 +270,25 @@ export default function (pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const [file, n] = args.trim().split(/\s+/);
       if (!file || !n) return notify(ctx, "usage: /music-transpose <file> <semitones>", "warning");
-      const r = await runCli(pi, ["transpose", n, file]);
+      const r = await runCli(pi, ["transpose", n, resolveFile(file)]);
       notify(ctx, r.ok ? r.stdout.trim() : r.stderr, r.ok ? "info" : "error");
+    },
+  });
+
+  pi.registerCommand("music-edit", {
+    description: "Edit a score with an instruction, e.g. /music-edit input/piece.abc fill in the gap",
+    handler: async (args, ctx) => {
+      const m = /^(S+)s+(.+)$/.exec(args.trim());
+      if (!m) return notify(ctx, "usage: /music-edit <file> <instruction>", "warning");
+      notify(ctx, "Editing… (edit -> validate -> critique -> render)", "info");
+      const r = await runCli(pi, ["edit", resolveFile(m[1]), m[2], "--json"], { timeout: 600000 });
+      if (!r.ok) return notify(ctx, `Edit failed:\n${r.stderr}\n${r.stdout}`, "error");
+      try {
+        const rec = JSON.parse(r.stdout);
+        notify(ctx, [`Edited "${rec.title}" — ${rec.critic?.score ?? "?"}/10`, "Files:", ...(rec.files ?? []), "", "ABC:", truncate(rec.abc ?? "", 3000)].join("\n"), "info");
+      } catch {
+        notify(ctx, r.stdout || "No output.", "warning");
+      }
     },
   });
 
@@ -223,7 +296,7 @@ export default function (pi: ExtensionAPI) {
     description: "Render an ABC file to sheet music (HTML/SVG)",
     handler: async (args, ctx) => {
       if (!args.trim()) return notify(ctx, "usage: /music-render <file>", "warning");
-      const r = await runCli(pi, ["render", args.trim()]);
+      const r = await runCli(pi, ["render", resolveFile(args.trim())]);
       notify(ctx, r.ok ? r.stdout.trim() : r.stderr, r.ok ? "info" : "error");
     },
   });
@@ -232,7 +305,7 @@ export default function (pi: ExtensionAPI) {
     description: "Validate an ABC file",
     handler: async (args, ctx) => {
       if (!args.trim()) return notify(ctx, "usage: /music-validate <file>", "warning");
-      const r = await runCli(pi, ["validate", args.trim()]);
+      const r = await runCli(pi, ["validate", resolveFile(args.trim())]);
       notify(ctx, r.ok ? r.stdout.trim() : `${r.stdout}\n${r.stderr}`, r.ok ? "info" : "warning");
     },
   });
@@ -241,7 +314,7 @@ export default function (pi: ExtensionAPI) {
     description: "Convert sheet music (PDF/image/MusicXML) to ABC",
     handler: async (args, ctx) => {
       if (!args.trim()) return notify(ctx, "usage: /music-convert <file>", "warning");
-      const r = await runCli(pi, ["convert", args.trim()]);
+      const r = await runCli(pi, ["convert", resolveFile(args.trim())]);
       notify(ctx, r.ok ? r.stdout.trim() : `${r.stdout}\n${r.stderr}`, r.ok ? "info" : "error");
     },
   });

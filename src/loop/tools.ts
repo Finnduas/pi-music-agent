@@ -27,7 +27,7 @@ export function toolSpecs(): ToolSpec[] {
       function: {
         name: "transpose",
         description:
-          "Transpose an ABC score by a number of semitones. Best-effort: preserves structure and spells accidentals as sharps.",
+          "Transpose an ABC score by a number of semitones. Key-signature aware: re-spells notes for the new key (F# -> C# in D major, Bb as a plain B in F major), keeps headers, voices and decorations intact.",
         parameters: {
           type: "object",
           properties: {

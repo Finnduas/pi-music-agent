@@ -49,16 +49,7 @@ check("analyze ends on tonic (D)", a.endsOnTonic === true && a.tonic === "D");
 
 check("transpose identity", transposeAbc("X:1\nK:D\nD E F G |]", 0).includes("K:D"));
 
-const up2 = transposeAbc("X:1\nK:D\nD E F G |]", 2);
-check("transpose key +2 -> E", up2.includes("K:E"));
-check("transpose notes +2", up2.includes("E ^F G A"));
-
-check("transpose chord", transposeAbc("X:1\nK:C\n[CEG]|", 2).includes("[D^FA]"));
-check(
-  "transpose preserves inline [K:] directive",
-  transposeAbc("X:1\nK:D\n[K:F] d e |", 2).includes("[K:F]"),
-);
-check("transpose B4 +2 -> ^c (C#5)", transposeAbc("X:1\nK:C\nB|", 2).includes("^c"));
+// (detailed transposition checks live in smoke-transpose.ts)
 
 if (!failed) console.log("\nAll music toolkit smoke checks passed.");
 else {

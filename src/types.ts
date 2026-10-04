@@ -33,6 +33,8 @@ export interface ComposeRequest {
   title?: string;
   /** If provided, skip composition and start from this ABC. */
   existingAbc?: string;
+  /** With existingAbc: treat `request` as an edit instruction (fill a gap, change a passage...). */
+  edit?: boolean;
   /** Reference ABC scores to emulate (e.g. pieces dropped in the input folder). */
   references?: string[];
 }

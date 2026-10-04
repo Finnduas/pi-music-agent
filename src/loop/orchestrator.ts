@@ -120,7 +120,23 @@ export async function composePiece(
 
   /* ---------------------------- initial ABC ----------------------------- */
   let abc = req.existingAbc?.trim() ?? "";
-  if (abc) {
+  const isEdit = Boolean(abc && req.edit);
+  if (isEdit) {
+    const before = analyzeScore(abc).gaps;
+    say(`Editing supplied score. Candidate gaps: ${before.length ? before.join("; ") : "none detected"}`);
+    const user =
+      `Edit the existing score below according to the instruction.\n\n` +
+      `Instruction: ${req.request}\n${styleLine}` +
+      `RULES: keep the header (X:, M:, L:, K:, V:) and every bar the instruction does not ` +
+      `mention EXACTLY as written. If asked to fill a gap, write music only for the gap ` +
+      `bars (rest-only bars or bars marked "GAP"), matching the surrounding key, meter, ` +
+      `voice, rhythm and phrase shape, and make the passage lead naturally into the next bar. ` +
+      `Remove any "GAP" markers you fill. Return the COMPLETE score.\n\n` +
+      `${factsBlock(abc)}\nCurrent ABC:\n\`\`\`abc\n${abc}\n\`\`\``;
+    abc = extractAbc(await askComposer(composer, composerSystem, user));
+    const after = analyzeScore(abc).gaps;
+    say(`Edit applied. Remaining candidate gaps: ${after.length ? after.join("; ") : "none"}`);
+  } else if (abc) {
     say("Starting from supplied ABC (skipping initial composition).");
   } else {
     say("Composing initial sketch...");
@@ -202,6 +218,7 @@ export async function composePiece(
       `Revise the following ABC score to address the critic's feedback. Return the ` +
       `complete revised score in a \`\`\`abc fenced block.\n\n` +
       `Original request: ${req.request}\n\n` +
+      (isEdit ? `This is an EDIT of an existing piece: change nothing outside the edited passage.\n\n` : "") +
       `Critic issues:\n${report.issues.map((i) => `- ${i}`).join("\n") || "- (none listed)"}\n\n` +
       `Suggested revisions:\n${report.suggestions.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +
       `Strengths to preserve:\n${report.strengths.map((s) => `- ${s}`).join("\n") || "- (none listed)"}\n\n` +

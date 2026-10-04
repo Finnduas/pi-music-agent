@@ -12,7 +12,7 @@ import { runSession } from "./loop/session.js";
 import { createValidator } from "./validate/validator.js";
 import { renderAbc } from "./render/renderer.js";
 import { Store } from "./store/store.js";
-import { analyzeScore, formatAnalysis, transposeAbc } from "./music/abc.js";
+import { analyzeScore, formatAnalysis, parseHeaders, transposeAbc } from "./music/abc.js";
 import { convertSheetMusic } from "./convert/convert.js";
 
 const program = new Command();
@@ -66,6 +66,44 @@ program
     }
     console.log("");
     console.log("---- ABC ----");
+    console.log(result.abc);
+  });
+
+/* --------------------------------- edit ---------------------------------- */
+program
+  .command("edit")
+  .description('Edit an existing ABC file with an instruction, e.g. "fill in the gap".')
+  .argument("<file>", "ABC file to edit")
+  .argument("<instruction>", 'what to change, e.g. "fill in the gap in bars 5-6"')
+  .option("-s, --style <style>", "style/period hint")
+  .option("-t, --title <title>", "title for the saved result")
+  .option("-c, --config <path>", "path to config.yaml")
+  .option("--dry-run", "skip rendering and storage", false)
+  .option("--json", "emit the full result as JSON on stdout", false)
+  .action(async (file: string, instruction: string, opts: any) => {
+    const cfg = loadConfig(opts.config);
+    const existingAbc = await fs.readFile(file, "utf8");
+    const title = opts.title ?? parseHeaders(existingAbc).t ?? path.basename(file, path.extname(file));
+    const result = await composePiece(
+      { request: instruction, style: opts.style, title, existingAbc, edit: true },
+      {
+        config: cfg,
+        noPersist: opts.dryRun,
+        onProgress: opts.json ? undefined : (l) => console.error(`  ${l}`),
+      },
+    );
+    if (opts.json) {
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+    console.log("");
+    console.log(`Title:      ${result.title}`);
+    console.log(`Score:      ${result.critic ? `${result.critic.score}/10` : "n/a"}`);
+    if (result.files.length) {
+      console.log("Files:");
+      for (const f of result.files) console.log(`  ${f}`);
+    }
+    console.log("\n---- ABC ----");
     console.log(result.abc);
   });
 

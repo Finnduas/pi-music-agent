@@ -5,16 +5,6 @@ dist/
 # local secrets & data
 config.yaml
 .env
-compositions/*.abc
-compositions/*.svg
-compositions/*.html
-compositions/*.mid
-compositions/*.db
-compositions/*.json
-compositions/*.jsonl
-compositions/abcjs-basic-min.js
-!compositions/.gitkeep
-
 # input (drop sheet music here) / output (rendered pieces)
 input/*
 !input/.gitkeep

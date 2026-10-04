@@ -23,6 +23,8 @@ export interface ScoreAnalysis {
   voices: string[];
   voiceCount: number;
   endsOnTonic: boolean | null;
+  /** Candidate gaps: rest-only bars or bars annotated "GAP"/"?" (hints, not truth). */
+  gaps: string[];
 }
 
 const NATURAL_PC: Record<string, number> = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
@@ -144,6 +146,61 @@ function lastNotePc(abc: string): number | null {
   return last;
 }
 
+/**
+ * Find candidate "gaps": bars that contain only rests, or carry a "GAP" / "?"
+ * text annotation (e.g. `"^GAP" z4`). Returned as human-readable ranges per
+ * voice, e.g. "RH bars 5-6". Deterministic hint; the user's request decides.
+ */
+export function findGaps(abc: string): string[] {
+  const byVoice = new Map<string, number[]>();
+  let voice = "default";
+  const barNo: Record<string, number> = {};
+  for (const raw of bodyOf(abc).split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("%")) continue;
+    const v = /^V\s*:\s*(\S+)/i.exec(line);
+    if (v) {
+      voice = v[1];
+      continue;
+    }
+    if (/^[A-Za-z]\s*:/.test(line)) continue; // other field / lyric lines
+    const bars = line.replace(/%.*$/, "").split(/\|\]|\[\||\|\||:\||\|:|\|/);
+    for (let piece of bars) {
+      piece = piece.replace(/^\s*\[?\d+(?=[\s[A-Za-z"^_=(]|$)/, "").trim(); // volta numbers
+      if (!piece) continue;
+      barNo[voice] = (barNo[voice] ?? 0) + 1;
+      const annotated = /"[^"]*(GAP|\?)[^"]*"/i.test(piece);
+      const stripped = piece
+        .replace(/"[^"]*"/g, "")
+        .replace(/![^!]*!/g, "")
+        .replace(/\[[A-Za-z]:[^\]]*\]/g, "")
+        .replace(/[\s()<>~.-]/g, "");
+      const restOnly = /^[zxZX\d/]*$/.test(stripped) && /[zxZX]/.test(stripped);
+      if (annotated || restOnly) {
+        const list = byVoice.get(voice) ?? [];
+        list.push(barNo[voice]);
+        byVoice.set(voice, list);
+      }
+    }
+  }
+  const out: string[] = [];
+  for (const [vid, nums] of byVoice) {
+    let start = nums[0];
+    let prev = nums[0];
+    const label = vid === "default" ? "" : vid + " ";
+    const flush = () => out.push(label + (start === prev ? `bar ${start}` : `bars ${start}-${prev}`));
+    for (const n of nums.slice(1)) {
+      if (n === prev + 1) prev = n;
+      else {
+        flush();
+        start = prev = n;
+      }
+    }
+    flush();
+  }
+  return out;
+}
+
 export function analyzeScore(abc: string): ScoreAnalysis {
   const h = parseHeaders(abc);
   const meter = meterOf(abc);
@@ -159,6 +216,7 @@ export function analyzeScore(abc: string): ScoreAnalysis {
     voices,
     voiceCount: voices.length,
     endsOnTonic: lastPc === null ? null : lastPc === tonic.pc,
+    gaps: findGaps(abc),
   };
 }
 
@@ -169,75 +227,277 @@ export function formatAnalysis(a: ScoreAnalysis): string {
     `- key: ${a.key} (tonic ${a.tonic}${a.minor ? ", minor-ish" : ""})`,
     `- voices: ${a.voiceCount} (${a.voices.join(", ")})`,
     `- ends on tonic: ${a.endsOnTonic === null ? "unknown" : a.endsOnTonic ? "yes" : "NO"}`,
+    `- candidate gaps (rest-only / "GAP" bars): ${a.gaps.length ? a.gaps.join("; ") : "none"}`,
   ].join("\n");
 }
 
 /* ----------------------------- transposition ----------------------------- */
+/*
+ * Key-signature-aware, spelling-preserving transposition.
+ *
+ *  - reads each note's real pitch using the key signature and in-bar accidentals
+ *  - moves it diatonically (same number of letter steps as the key moves) so that
+ *    F# in G major becomes C# in D major, and Bb in F major stays a B in the key
+ *  - re-emits only the accidentals that the NEW key signature / bar state needs
+ *  - leaves headers, voice lines, quoted chords, !decorations! and comments alone
+ */
 
-function noteEmitted(acc: string, letter: string, oct: string, dur: string, delta: number): string {
-  const oldPc = pitchClassOf(acc === "=" ? "" : acc, letter);
-  const markerCount = (oct.match(/'/g) ?? []).length - (oct.match(/,/g) ?? []).length;
-  const baseOct = /[a-g]/.test(letter) ? 5 : 4;
-  const oldMidi = (baseOct + markerCount) * 12 + oldPc;
-  const newMidi = oldMidi + delta;
-  const newOct = Math.floor(newMidi / 12);
-  const newPc = ((newMidi % 12) + 12) % 12;
-  const name = SHARP_NAMES[newPc];
-  const sharp = name.endsWith("#");
-  const bare = sharp ? name[0] : name;
-  const upper = newOct <= 4;
-  const markers = upper ? newOct - 4 : newOct - 5;
-  const octStr = markers > 0 ? "'".repeat(markers) : markers < 0 ? ",".repeat(-markers) : "";
-  const letterOut = upper ? bare.toUpperCase() : bare.toLowerCase();
-  return (sharp ? "^" : "") + letterOut + octStr + (dur ?? "");
+const LETTERS = ["C", "D", "E", "F", "G", "A", "B"];
+const LETTER_PC = [0, 2, 4, 5, 7, 9, 11];
+/** Circle-of-fifths position of each natural major key (C=0, G=1, F=-1, ...). */
+const LETTER_FIFTHS: Record<string, number> = { F: -1, C: 0, G: 1, D: 2, A: 3, E: 4, B: 5 };
+const SHARP_ORDER = ["F", "C", "G", "D", "A", "E", "B"];
+const FLAT_ORDER = ["B", "E", "A", "D", "G", "C", "F"];
+
+/** Mode -> fifths offset relative to the major key on the same tonic. */
+const MODE_FIFTHS: Record<string, number> = {
+  maj: 0, ion: 0, mix: -1, dor: -2, aeo: -3, min: -3, m: -3, phr: -4, lyd: 1, loc: -5,
+};
+
+interface KeyInfo {
+  letter: string; // tonic letter A-G
+  acc: number; // tonic accidental -1/0/1
+  modeText: string; // text after the tonic accidental, e.g. "m", " dor", " clef=bass"
+  modeFifths: number;
 }
 
-function transposeLine(line: string, delta: number): string {
-  if (/^\s*(w|s)\s*:/i.test(line)) return line;
-  const protectedSegments: string[] = [];
-  let buf = line;
-  // Protect quoted text and inline [K:...]/[M:...]/[L:...] directives.
-  buf = buf.replace(/"[^"]*"/g, (s) => protect(protectedSegments, s));
-  buf = buf.replace(/\[[^\]]*:[^\]]*\]/g, (s) => protect(protectedSegments, s));
-  buf = buf.replace(NOTE_RE, (m, acc, letter, oct, dur) =>
-    noteEmitted(acc ?? "", letter ?? m, oct ?? "", dur ?? "", delta),
+function parseKey(value: string): KeyInfo {
+  const m = /^\s*([A-Ga-g])([#b]?)(.*)$/.exec(value);
+  if (!m) return { letter: "C", acc: 0, modeText: value.trim() ? " " + value.trim() : "", modeFifths: 0 };
+  const rest = m[3];
+  const word = rest.trim().toLowerCase();
+  let modeFifths = 0;
+  if (/^(maj)/.test(word) || /^ion/.test(word)) modeFifths = 0;
+  else if (/^mix/.test(word)) modeFifths = MODE_FIFTHS.mix;
+  else if (/^dor/.test(word)) modeFifths = MODE_FIFTHS.dor;
+  else if (/^phr/.test(word)) modeFifths = MODE_FIFTHS.phr;
+  else if (/^lyd/.test(word)) modeFifths = MODE_FIFTHS.lyd;
+  else if (/^loc/.test(word)) modeFifths = MODE_FIFTHS.loc;
+  else if (/^(aeo|min|m(?![a-z]))/.test(word)) modeFifths = MODE_FIFTHS.min;
+  return {
+    letter: m[1].toUpperCase(),
+    acc: m[2] === "#" ? 1 : m[2] === "b" ? -1 : 0,
+    modeText: rest,
+    modeFifths,
+  };
+}
+
+function tonicPc(k: KeyInfo): number {
+  return (((LETTER_PC[LETTERS.indexOf(k.letter)] + k.acc) % 12) + 12) % 12;
+}
+
+/** Signed number of sharps (+) or flats (-) in the key signature. */
+function fifthsOf(k: KeyInfo): number {
+  return LETTER_FIFTHS[k.letter] + 7 * k.acc + k.modeFifths;
+}
+
+function signatureOf(fifths: number): number[] {
+  const sig = [0, 0, 0, 0, 0, 0, 0]; // indexed like LETTERS (C D E F G A B)
+  if (fifths > 0) for (let i = 0; i < Math.min(7, fifths); i++) sig[LETTERS.indexOf(SHARP_ORDER[i])] = 1;
+  if (fifths < 0) for (let i = 0; i < Math.min(7, -fifths); i++) sig[LETTERS.indexOf(FLAT_ORDER[i])] = -1;
+  return sig;
+}
+
+/** Spell the transposed tonic using the candidate with the fewest accidentals. */
+function transposeKey(k: KeyInfo, semitones: number): KeyInfo {
+  const target = (((tonicPc(k) + semitones) % 12) + 12) % 12;
+  const oldFifths = fifthsOf(k);
+  let best: KeyInfo | null = null;
+  let bestScore = Infinity;
+  for (const letter of LETTERS) {
+    for (const acc of [-1, 0, 1]) {
+      const cand: KeyInfo = { letter, acc, modeText: k.modeText, modeFifths: k.modeFifths };
+      if (tonicPc(cand) !== target) continue;
+      const f = fifthsOf(cand);
+      // fewest accidentals; on a tie keep the direction (sharps/flats) of the old key
+      const score = Math.abs(f) * 10 + (f * oldFifths < 0 ? 1 : 0);
+      if (score < bestScore) {
+        best = cand;
+        bestScore = score;
+      }
+    }
+  }
+  return best ?? k;
+}
+
+function keyText(k: KeyInfo): string {
+  return k.letter + (k.acc > 0 ? "#" : k.acc < 0 ? "b" : "") + k.modeText;
+}
+
+interface Ctx {
+  oldSig: number[];
+  newSig: number[];
+  newKey: KeyInfo;
+  stepsTotal: number; // diatonic steps to move every note
+  semitones: number;
+}
+
+function makeCtx(keyValue: string, semitones: number): Ctx {
+  const oldKey = parseKey(keyValue);
+  const newKey = transposeKey(oldKey, semitones);
+  const t = (((tonicPc(newKey) - tonicPc(oldKey)) % 12) + 12) % 12;
+  const stepShift = (((LETTERS.indexOf(newKey.letter) - LETTERS.indexOf(oldKey.letter)) % 7) + 7) % 7;
+  const octaves = Math.round((semitones - t) / 12);
+  return {
+    oldSig: signatureOf(fifthsOf(oldKey)),
+    newSig: signatureOf(fifthsOf(newKey)),
+    newKey,
+    stepsTotal: stepShift + 7 * octaves,
+    semitones,
+  };
+}
+
+const ACC_TEXT: Record<number, string> = { "-2": "__", "-1": "_", 0: "=", 1: "^", 2: "^^" };
+
+/** Tokens inside a music line that must NOT be scanned for notes. */
+const TOKEN_RE =
+  /"[^"]*"|![^!]*!|\+[^+\s]*\+|%.*$|\[[A-Za-z]:[^\]]*\]|(\|\]|\[\||\|\||:\||\|:|\||::)|([=_^]{0,2})([a-gA-G])([',]*)/g;
+
+
+/** Shift one chord root (letter + accidental) diatonically, preserving its function. */
+function shiftChordRoot(letter: string, accText: string, ctx: Ctx): string {
+  const li = LETTERS.indexOf(letter);
+  const acc = accText === "#" ? 1 : accText === "b" ? -1 : 0;
+  const pc = (((LETTER_PC[li] + acc + ctx.semitones) % 12) + 12) % 12;
+  const nli = (((li + ctx.stepsTotal) % 7) + 7) % 7;
+  let d = pc - LETTER_PC[nli];
+  if (d > 6) d -= 12;
+  if (d < -6) d += 12;
+  if (Math.abs(d) > 1) {
+    // awkward spelling (e.g. double sharp): use the plain sharp/flat name of the pitch class
+    const names = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
+    return names[pc];
+  }
+  return LETTERS[nli] + (d > 0 ? "#" : d < 0 ? "b" : "");
+}
+
+const CHORD_RE = new RegExp(
+  "^([A-G])([#b]?)((?:maj|min|dim|aug|sus|add|alt|m|M|[0-9+°ø()#b-])*)(?:/([A-G])([#b]?))?$",
+);
+
+/** Transpose a quoted chord symbol such as "Am7/G"; returns null for annotations/text. */
+function transposeChordSymbol(quoted: string, ctx: Ctx): string | null {
+  const m = CHORD_RE.exec(quoted.slice(1, -1));
+  if (!m) return null;
+  let out = shiftChordRoot(m[1], m[2], ctx) + m[3];
+  if (m[4]) out += "/" + shiftChordRoot(m[4], m[5], ctx);
+  return '"' + out + '"';
+}
+
+function transposeBodyLine(line: string, ctxRef: { ctx: Ctx }, bars: { old: Map<string, number>; neu: Map<string, number> }): string {
+  return line.replace(
+    TOKEN_RE,
+    (match: string, barline?: string, acc?: string, letter?: string, marks?: string) => {
+      if (barline) {
+        bars.old.clear();
+        bars.neu.clear();
+        return match;
+      }
+      if (letter === undefined) {
+        const f = /^\[K:\s*([^\]]*)\]$/.exec(match);
+        if (f) {
+          ctxRef.ctx = makeCtx(f[1], ctxRef.ctx.semitones);
+          bars.old.clear();
+          bars.neu.clear();
+          return `[K:${keyText(ctxRef.ctx.newKey)}]`;
+        }
+        if (match.startsWith('"')) return transposeChordSymbol(match, ctxRef.ctx) ?? match;
+        return match; // annotation, decoration, comment, other inline field
+      }
+      const ctx = ctxRef.ctx;
+      const up = letter === letter.toUpperCase();
+      const li = LETTERS.indexOf(letter.toUpperCase());
+      const oct = (up ? 4 : 5) + (marks!.match(/'/g) ?? []).length - (marks!.match(/,/g) ?? []).length;
+
+      // --- read the real old pitch
+      const oldKeyId = `${li}:${oct}`;
+      let oldAcc = ctx.oldSig[li];
+      if (acc) {
+        oldAcc = acc === "=" ? 0 : acc.includes("^") ? acc.length : -acc.length;
+        bars.old.set(oldKeyId, oldAcc);
+      } else if (bars.old.has(oldKeyId)) {
+        oldAcc = bars.old.get(oldKeyId)!;
+      }
+      const midi = (oct + 1) * 12 + LETTER_PC[li] + oldAcc;
+      const newMidi = midi + ctx.semitones;
+
+      // --- diatonic move, then work out the accidental the new letter needs
+      const dn = oct * 7 + li + ctx.stepsTotal;
+      let nli = ((dn % 7) + 7) % 7;
+      let noct = Math.floor(dn / 7);
+      let need = newMidi - ((noct + 1) * 12 + LETTER_PC[nli]);
+      if (need < -2 || need > 2) {
+        // pathological spelling: fall back to a sharp spelling of the pitch
+        const pc = ((newMidi % 12) + 12) % 12;
+        noct = Math.floor(newMidi / 12) - 1;
+        const sharpLetter = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][pc];
+        nli = sharpLetter;
+        need = pc - LETTER_PC[sharpLetter];
+      }
+
+      // --- emit only what the new key / bar state requires
+      const newKeyId = `${nli}:${noct}`;
+      const effective = bars.neu.has(newKeyId) ? bars.neu.get(newKeyId)! : ctx.newSig[nli];
+      let accOut = "";
+      if (need !== effective) {
+        accOut = ACC_TEXT[need];
+        bars.neu.set(newKeyId, need);
+      }
+      const upper = noct <= 4;
+      const markers = upper ? 4 - noct : noct - 5;
+      const markOut = upper ? ",".repeat(markers) : "'".repeat(markers);
+      const name = upper ? LETTERS[nli] : LETTERS[nli].toLowerCase();
+      return accOut + name + markOut;
+    },
   );
-  return buf.replace(/\u0000(\d+)\u0000/g, (_m, idx) => protectedSegments[Number(idx)]);
 }
 
-function protect(segments: string[], s: string): string {
-  segments.push(s);
-  return `\u0000${segments.length - 1}\u0000`;
-}
-
-function transposeKeyValue(key: string, delta: number): string {
-  const m = /^([A-Ga-g])([#b]?)(.*)$/.exec(key.trim());
-  if (!m) return key;
-  const letter = m[1].toUpperCase();
-  const accidental = m[2];
-  const oldPc = pitchClassOf(accidental === "#" ? "^" : accidental === "b" ? "_" : "", letter);
-  const newPc = ((oldPc + delta) % 12 + 12) % 12;
-  return SHARP_NAMES[newPc] + m[3];
-}
-
-/** Best-effort chromatic transposition (preserves structure, spells in sharps). */
+/**
+ * Transpose an ABC score by `semitones` (negative = down). Key-signature aware;
+ * preserves spelling (F# -> C# in D major, Bb written as a plain B in F major).
+ */
 export function transposeAbc(abc: string, semitones: number): string {
-  const delta = ((semitones % 12) + 12) % 12;
-  if (delta === 0) return abc;
+  if (!Number.isInteger(semitones) || semitones === 0) return abc;
   const lines = abc.split(/\r?\n/);
   const out: string[] = [];
   let inBody = false;
+  const ctxRef = { ctx: makeCtx("C", semitones) };
+  const bars = { old: new Map<string, number>(), neu: new Map<string, number>() };
   for (const line of lines) {
     if (!inBody) {
-      if (/^\s*K\s*:/i.test(line.trim())) {
-        out.push(line.replace(/^(\s*K\s*:\s*)(.*)$/i, (_m, p1, p2) => p1 + transposeKeyValue(p2, delta)));
+      const k = /^(\s*K\s*:\s*)(.*)$/i.exec(line);
+      if (k && !/^\s*K\s*:\s*(none|Hp|HP)\b/i.test(line)) {
+        ctxRef.ctx = makeCtx(k[2], semitones);
+        out.push(k[1] + keyText(ctxRef.ctx.newKey));
         inBody = true;
+      } else {
+        out.push(line);
+        if (k) inBody = true;
+      }
+      continue;
+    }
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith("%")) {
+      out.push(line);
+      continue;
+    }
+    const field = /^([A-Za-z]):/.exec(trimmed);
+    if (field) {
+      if (field[1].toUpperCase() === "V") {
+        bars.old.clear();
+        bars.neu.clear();
+      }
+      // a K: line inside the body changes the key; every other info field is text
+      const k = /^(\s*K\s*:\s*)(.*)$/i.exec(line);
+      if (k) {
+        ctxRef.ctx = makeCtx(k[2], semitones);
+        out.push(k[1] + keyText(ctxRef.ctx.newKey));
       } else {
         out.push(line);
       }
       continue;
     }
-    out.push(transposeLine(line, delta));
+    out.push(transposeBodyLine(line, ctxRef, bars));
   }
   return out.join("\n");
 }
